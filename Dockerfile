@@ -33,11 +33,11 @@ VOLUME ["/root/.openclaw"]
 
 EXPOSE 18789
 
-# Auto-start gateway if onboarding is done, otherwise wait for manual setup
+# Try to start gateway (will work if onboarding is done, silently fail if not)
+# Container stays alive either way — run "openclaw onboard" if first time
 CMD ["bash", "-c", "\
-  if [ -d /root/.openclaw ] && openclaw gateway --port 18789 > /dev/null 2>&1 & then \
-    echo '🦞 OpenClaw gateway started on port 18789'; \
-  else \
-    echo '🦞 OpenClaw container ready. Run: openclaw onboard'; \
-  fi; \
+  echo '🦞 OpenClaw container started.'; \
+  openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
+  if [ $? -eq 0 ]; then echo '🦞 Gateway process launched (check logs: /root/.openclaw/gateway.log)'; fi; \
+  echo '💡 First time? Run: openclaw onboard'; \
   tail -f /dev/null"]
