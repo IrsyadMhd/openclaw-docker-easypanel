@@ -33,6 +33,11 @@ VOLUME ["/root/.openclaw"]
 
 EXPOSE 18789
 
-# Keep container running (like a VPS)
-# After exec into terminal, run: openclaw onboard
-CMD ["bash", "-c", "echo '🦞 OpenClaw container ready. Run: openclaw onboard' && tail -f /dev/null"]
+# Auto-start gateway if onboarding is done, otherwise wait for manual setup
+CMD ["bash", "-c", "\
+  if [ -d /root/.openclaw ] && openclaw gateway --port 18789 > /dev/null 2>&1 & then \
+    echo '🦞 OpenClaw gateway started on port 18789'; \
+  else \
+    echo '🦞 OpenClaw container ready. Run: openclaw onboard'; \
+  fi; \
+  tail -f /dev/null"]
