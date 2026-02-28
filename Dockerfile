@@ -17,10 +17,15 @@ RUN apt-get update && \
       curl \
       git \
       nano \
+      vim \
       htop \
       procps \
+      rclone \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Create rclone config directory
+RUN mkdir -p /root/.config/rclone
 
 # Install OpenClaw globally
 RUN npm install -g openclaw@latest
@@ -35,8 +40,13 @@ EXPOSE 18789
 
 # Try to start gateway (will work if onboarding is done, silently fail if not)
 # Container stays alive either way — run "openclaw onboard" if first time
+# RCLONE_CONF env var → auto-generate rclone.conf on startup
 CMD ["bash", "-c", "\
   echo '🦞 OpenClaw container started.'; \
+  if [ -n \"$RCLONE_CONF\" ]; then \
+    echo \"$RCLONE_CONF\" > /root/.config/rclone/rclone.conf; \
+    echo '📁 rclone.conf generated from RCLONE_CONF env'; \
+  fi; \
   openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
   if [ $? -eq 0 ]; then echo '🦞 Gateway process launched (check logs: /root/.openclaw/gateway.log)'; fi; \
   echo '💡 First time? Run: openclaw onboard'; \
