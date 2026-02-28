@@ -2,7 +2,7 @@
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw` secara global.
+Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `vim`, dan `rclone` secara global.
 Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
 
 ---
@@ -41,6 +41,28 @@ Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup aw
 2. Setelah restart, gateway akan **otomatis berjalan** di background
 3. Coba chat ke bot Telegram — seharusnya sudah merespons ✅
 
+### Langkah 4 — Setup Rclone (Opsional)
+
+Rclone sudah terinstall dan config file kosong sudah tersedia.
+Config disimpan di volume persistent (`/root/.openclaw/rclone/`), jadi **tidak hilang** saat rebuild.
+
+1. Buka Terminal di EasyPanel
+2. Edit config:
+   ```bash
+   vim /root/.config/rclone/rclone.conf
+   ```
+3. Isi konfigurasi rclone, contoh:
+   ```ini
+   [gdrive]
+   type = drive
+   team_drive =
+   token = {"access_token":"ya29.a0AT......."}
+   ```
+4. Simpan (`:wq`), lalu verifikasi:
+   ```bash
+   rclone lsd gdrive:
+   ```
+
 ### Setelah Restart — Verifikasi
 
 Buka Terminal di EasyPanel, cek gateway berjalan:
@@ -49,7 +71,7 @@ Buka Terminal di EasyPanel, cek gateway berjalan:
 ps aux | grep openclaw
 ```
 
-Jika ada proses `openclaw gateway`, berarti sudah jalan. ✅
+Jika ada proses `openclaw-gateway`, berarti sudah jalan. ✅
 
 ---
 
@@ -69,6 +91,8 @@ Onboarding Selesai
 Container Start → Gateway BERHASIL (config sudah ada) ✅
     ↓
 Bot Telegram aktif, siap digunakan 🎉
+    ↓
+(Opsional) Setup rclone via vim
 ```
 
 ---
@@ -87,7 +111,24 @@ openclaw onboard
 
 # 4. Restart container setelah onboarding
 docker restart openclaw
+
+# 5. (Opsional) Setup rclone
+vim /root/.config/rclone/rclone.conf
 ```
+
+---
+
+## Tools yang Tersedia di Container
+
+| Tool | Kegunaan |
+|------|----------|
+| `openclaw` | AI assistant via Telegram |
+| `vim` | Text editor |
+| `rclone` | Sync/transfer file ke cloud storage (GDrive, S3, dll) |
+| `nano` | Text editor alternatif |
+| `git` | Version control |
+| `htop` | Monitor proses |
+| `curl` | HTTP request |
 
 ---
 
@@ -98,6 +139,23 @@ openclaw onboard                          # Setup awal (pertama kali)
 openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
 openclaw doctor                           # Diagnostik
 openclaw update                           # Update ke versi terbaru
+rclone lsd gdrive:                        # Test koneksi rclone
+rclone copy gdrive:folder /local/path     # Copy file dari cloud
+```
+
+---
+
+## Struktur Persistent Data
+
+Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
+
+```
+/root/.openclaw/
+├── rclone/
+│   └── rclone.conf          ← Config rclone (symlink ke /root/.config/rclone/)
+├── workspace/                ← Working directory openclaw
+├── gateway.log               ← Log gateway
+└── ... (config openclaw lainnya)
 ```
 
 ---
@@ -112,3 +170,5 @@ openclaw update                           # Update ke versi terbaru
 | Perlu update openclaw | Masuk terminal → `npm install -g openclaw@latest` |
 | Cek log gateway | `cat /root/.openclaw/gateway.log` |
 | Onboarding sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
+| Rclone config hilang setelah rebuild | Seharusnya tidak, karena disimpan di volume. Cek volume mount di EasyPanel |
+| Rclone error "config not found" | Cek symlink: `ls -la /root/.config/rclone/` |
