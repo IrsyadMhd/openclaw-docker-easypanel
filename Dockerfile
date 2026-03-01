@@ -29,8 +29,8 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && ln -s /root/.openclaw/rclone /root/.config/rclone \
     && touch /root/.openclaw/rclone/rclone.conf
 
-# Install OpenClaw globally
-RUN npm install -g openclaw@2026.2.3
+# Install OpenClaw and Gemini CLI globally
+RUN npm install -g openclaw@2026.2.3 @google/gemini-cli
 
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace

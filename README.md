@@ -123,6 +123,7 @@ vim /root/.config/rclone/rclone.conf
 | Tool | Kegunaan |
 |------|----------|
 | `openclaw` | AI assistant via Telegram |
+| `gemini` | Google Gemini CLI — AI coding assistant |
 | `vim` | Text editor |
 | `rclone` | Sync/transfer file ke cloud storage (GDrive, S3, dll) |
 | `nano` | Text editor alternatif |
