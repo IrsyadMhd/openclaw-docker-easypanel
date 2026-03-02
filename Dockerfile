@@ -30,7 +30,7 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-RUN npm install -g openclaw@2026.2.3
+RUN npm install -g openclaw@2026.2.26
 
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
