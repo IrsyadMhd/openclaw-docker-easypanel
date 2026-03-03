@@ -1,28 +1,33 @@
 # =============================================================================
 # OpenClaw — Simple VPS-Style Container for ARM64 (EasyPanel)
+# Base: OpenCloudOS 9
 # =============================================================================
 # Konsep: Container ini seperti VPS kosong yang sudah terinstall openclaw.
 # Tinggal exec ke terminal dan jalankan: openclaw onboard
 #
-# Build:  docker build --platform linux/arm64 -f Dockerfile.arm64 -t openclaw:arm64 .
+# Build:  docker build --platform linux/arm64 -t openclaw:arm64 .
 # Run:    docker run -d --name openclaw -p 18789:18789 openclaw:arm64
 # Exec:   docker exec -it openclaw bash
 # =============================================================================
 
-FROM --platform=linux/arm64 node:22-bookworm
+FROM --platform=linux/arm64 opencloudos/opencloudos:9
 
 # Install essential tools (like a real VPS)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN dnf install -y \
       curl \
       git \
       nano \
-      vim \
+      vim-enhanced \
       htop \
-      procps \
+      procps-ng \
       rclone \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Install Node.js 22 via NodeSource
+RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - \
+    && dnf install -y nodejs \
+    && dnf clean all
 
 # Rclone config — stored in persistent volume, symlinked to default path
 RUN mkdir -p /root/.openclaw/rclone /root/.config \
