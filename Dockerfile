@@ -10,7 +10,7 @@
 # Exec:   docker exec -it openclaw bash
 # =============================================================================
 
-FROM --platform=linux/arm64 opencloudos/opencloudos:9
+FROM --platform=linux/arm64 opencloudos/opencloudos9-minimal
 
 # Install essential tools (like a real VPS)
 RUN dnf install -y \
