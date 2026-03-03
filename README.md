@@ -2,7 +2,7 @@
 
 ## Konsep
 
-Container berbasis **OpenCloudOS 9** (cloud-native, ARM64 native) yang bekerja seperti **VPS** — sudah terinstall `openclaw`, `vim`, dan `rclone` secara global.
+Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `vim`, dan `rclone` secara global.
 Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
 
 ---
@@ -169,7 +169,6 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 | Container exit sendiri | Pastikan `restart: unless-stopped` aktif |
 | Port tidak bisa diakses | Pastikan gateway bind ke `lan`: `openclaw gateway --port 18789 --bind lan &` |
 | Perlu update openclaw | Masuk terminal → `npm install -g openclaw@latest` |
-| Perlu install package tambahan | Gunakan `dnf install -y <package>` (OpenCloudOS berbasis RPM) |
 | Cek log gateway | `cat /root/.openclaw/gateway.log` |
 | Onboarding sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
 | Rclone config hilang setelah rebuild | Seharusnya tidak, karena disimpan di volume. Cek volume mount di EasyPanel |
