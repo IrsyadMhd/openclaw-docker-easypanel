@@ -18,11 +18,14 @@ RUN dnf install -y \
       git \
       nano \
       vim-enhanced \
-      htop \
       procps-ng \
-      rclone \
+      epel-release \
+    && dnf install -y htop \
     && dnf clean all \
     && rm -rf /var/cache/dnf
+
+# Install rclone via official script
+RUN curl -fsSL https://rclone.org/install.sh | bash
 
 # Install Node.js 22 via NodeSource
 RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - \
