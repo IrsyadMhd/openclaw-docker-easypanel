@@ -44,7 +44,7 @@ EXPOSE 18789
 # Container stays alive either way — run "openclaw onboard" if first time
 CMD ["bash", "-c", "\
   echo '🦞 OpenClaw container started.'; \
-  openclaw gateway --port 18789 --bind lan >> /root/.openclaw/gateway.log 2>&1 & \
+  openclaw gateway --port 18789 --bind lan --controlUi.dangerouslyAllowHostHeaderOriginFallback true >> /root/.openclaw/gateway.log 2>&1 & \
   if [ $? -eq 0 ]; then echo '🦞 Gateway process launched (check logs: /root/.openclaw/gateway.log)'; fi; \
   echo '💡 First time? Run: openclaw onboard'; \
   tail -f /dev/null"]
