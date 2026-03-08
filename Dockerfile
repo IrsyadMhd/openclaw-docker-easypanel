@@ -24,6 +24,10 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Set timezone to Asia/Jakarta (WIB)
+ENV TZ=Asia/Jakarta
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Rclone config — stored in persistent volume, symlinked to default path
 RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && ln -s /root/.openclaw/rclone /root/.config/rclone \
