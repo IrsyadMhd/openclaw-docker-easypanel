@@ -45,10 +45,16 @@ VOLUME ["/root/.openclaw"]
 EXPOSE 18789
 
 # Try to start gateway (will work if onboarding is done, silently fail if not)
+# Guard: skip if gateway already running (e.g. after container restart)
 # Container stays alive either way — run "openclaw onboard" if first time
 CMD ["bash", "-c", "\
   echo '🦞 OpenClaw container started.'; \
-  openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
-  if [ $? -eq 0 ]; then echo '🦞 Gateway process launched (check logs: /root/.openclaw/gateway.log)'; fi; \
+  if pgrep -f 'openclaw gateway' > /dev/null; then \
+    echo '⚠️  Gateway already running, skipping...'; \
+  else \
+    openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
+    echo $! > /run/openclaw-gateway.pid; \
+    echo '🦞 Gateway launched (PID: '\"$!\"', logs: /root/.openclaw/gateway.log)'; \
+  fi; \
   echo '💡 First time? Run: openclaw onboard'; \
   tail -f /dev/null"]
