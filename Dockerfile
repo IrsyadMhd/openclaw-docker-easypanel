@@ -33,8 +33,13 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && ln -s /root/.openclaw/rclone /root/.config/rclone \
     && touch /root/.openclaw/rclone/rclone.conf
 
-# Install OpenClaw and Gemini CLI globally
+# Install OpenClaw globally
 RUN npm install -g openclaw@2026.3.24
+
+# Install Kiro CLI via .deb package
+RUN curl -fsSL -o /tmp/kiro-cli.deb https://desktop-release.q.us-east-1.amazonaws.com/latest/kiro-cli.deb \
+    && (dpkg -i /tmp/kiro-cli.deb || apt-get install -f -y) \
+    && rm -f /tmp/kiro-cli.deb
 
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
@@ -57,4 +62,5 @@ CMD ["bash", "-c", "\
     echo '🦞 Gateway launched (PID: '\"$!\"', logs: /root/.openclaw/gateway.log)'; \
   fi; \
   echo '💡 First time? Run: openclaw onboard'; \
+  echo '🤖 Kiro CLI ready. Run: kiro-cli login'; \
   tail -f /dev/null"]
