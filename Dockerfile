@@ -41,9 +41,10 @@ RUN npm install -g openclaw@2026.3.24
 RUN curl --proto '=https' --tlsv1.2 -sSf \
       'https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-aarch64-linux.zip' \
       -o /tmp/kirocli.zip \
-    && unzip -q /tmp/kirocli.zip -d /tmp/kirocli \
-    && /tmp/kirocli/kirocli/install.sh \
-    && rm -rf /tmp/kirocli.zip /tmp/kirocli
+    && unzip -q /tmp/kirocli.zip -d /tmp/kirocli-extract \
+    && ls -laR /tmp/kirocli-extract/ \
+    && find /tmp/kirocli-extract -name 'kiro-cli' -o -name 'kiro' -o -name 'install.sh' | head -20 \
+    && rm -rf /tmp/kirocli.zip /tmp/kirocli-extract
 
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
