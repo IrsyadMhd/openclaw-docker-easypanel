@@ -21,6 +21,7 @@ RUN apt-get update && \
       htop \
       procps \
       rclone \
+      unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,10 +37,13 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
 # Install OpenClaw globally
 RUN npm install -g openclaw@2026.3.24
 
-# Install Kiro CLI via .deb package
-RUN curl -fsSL -o /tmp/kiro-cli.deb https://desktop-release.q.us-east-1.amazonaws.com/latest/kiro-cli.deb \
-    && (dpkg -i /tmp/kiro-cli.deb || apt-get install -f -y) \
-    && rm -f /tmp/kiro-cli.deb
+# Install Kiro CLI (aarch64 zip)
+RUN curl --proto '=https' --tlsv1.2 -sSf \
+      'https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-aarch64-linux.zip' \
+      -o /tmp/kirocli.zip \
+    && unzip -q /tmp/kirocli.zip -d /tmp/kirocli \
+    && /tmp/kirocli/kirocli/install.sh \
+    && rm -rf /tmp/kirocli.zip /tmp/kirocli
 
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
