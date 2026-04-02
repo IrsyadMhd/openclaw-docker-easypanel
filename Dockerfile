@@ -35,15 +35,8 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-RUN npm install -g openclaw@2026.3.24
+RUN npm install -g openclaw@2026.4.1
 
-# Install Kiro CLI (aarch64 zip)
-RUN curl --proto '=https' --tlsv1.2 -sSf \
-      'https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-aarch64-linux.zip' \
-      -o /tmp/kirocli.zip \
-    && unzip -q /tmp/kirocli.zip -d /tmp/kirocli-extract \
-    && cp /tmp/kirocli-extract/kirocli/bin/* /usr/local/bin/ \
-    && rm -rf /tmp/kirocli.zip /tmp/kirocli-extract
 
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
@@ -66,5 +59,5 @@ CMD ["bash", "-c", "\
     echo '🦞 Gateway launched (PID: '\"$!\"', logs: /root/.openclaw/gateway.log)'; \
   fi; \
   echo '💡 First time? Run: openclaw onboard'; \
-  echo '🤖 Kiro CLI ready. Run: kiro-cli login'; \
+
   tail -f /dev/null"]
