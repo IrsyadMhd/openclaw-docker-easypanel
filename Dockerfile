@@ -37,7 +37,7 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-RUN npm install -g openclaw@2026.4.1
+RUN npm install -g openclaw@2026.4.11
 
 # Install Python packages (baked into image, persists across restarts)
 RUN pip3 install --break-system-packages mysql-connector-python
