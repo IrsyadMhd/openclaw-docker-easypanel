@@ -42,6 +42,14 @@ RUN npm install -g openclaw@2026.4.15
 # Install Python packages (baked into image, persists across restarts)
 RUN pip3 install --break-system-packages mysql-connector-python
 
+# Install gogcli (gog) — Google Suite CLI (Gmail, GCal, GDrive, Contacts, etc.)
+# https://github.com/steipete/gogcli
+ARG TARGETARCH
+ARG GOG_VERSION=0.12.0
+RUN curl -fsSL "https://github.com/steipete/gogcli/releases/download/v${GOG_VERSION}/gogcli_${GOG_VERSION}_linux_${TARGETARCH}.tar.gz" \
+      | tar -xz -C /usr/local/bin gog \
+    && chmod +x /usr/local/bin/gog
+
 # Create working directories
 RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
 

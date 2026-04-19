@@ -2,7 +2,7 @@
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `vim`, dan `rclone` secara global.
+Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
 Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
 
 ---
@@ -63,6 +63,35 @@ Config disimpan di volume persistent (`/root/.openclaw/rclone/`), jadi **tidak h
    rclone lsd gdrive:
    ```
 
+### Langkah 5 — Setup Gog CLI (Opsional)
+
+[`gog`](https://github.com/steipete/gogcli) adalah CLI untuk Google Suite — Gmail, Calendar, Drive, Contacts, Sheets, Docs, dan lainnya. Sudah terinstall di container.
+
+1. **Buat OAuth2 Credentials** di [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+   - Buat project → Enable API yang dibutuhkan (Gmail, Drive, Calendar, dll)
+   - Buat OAuth client (Desktop app) → Download JSON file
+
+2. **Upload credentials** ke container (via rclone, scp, atau paste manual):
+   ```bash
+   # Simpan credentials
+   gog auth credentials /path/to/client_secret_xxx.json
+   ```
+
+3. **Tambah akun Google** (headless/remote flow untuk server tanpa browser):
+   ```bash
+   # Manual flow — cocok untuk server tanpa browser
+   gog auth add you@gmail.com --services user --manual
+   # CLI akan print URL → buka di browser lokal → paste redirect URL kembali
+   ```
+
+4. **Test**:
+   ```bash
+   export GOG_ACCOUNT=you@gmail.com
+   gog gmail labels list
+   ```
+
+> 💡 **Tips**: Gunakan `--manual` atau `--remote` flag saat `auth add`, karena container tidak punya browser.
+
 ### Setelah Restart — Verifikasi
 
 Buka Terminal di EasyPanel, cek gateway berjalan:
@@ -92,7 +121,7 @@ Container Start → Gateway BERHASIL (config sudah ada) ✅
     ↓
 Bot Telegram aktif, siap digunakan 🎉
     ↓
-(Opsional) Setup rclone via vim
+(Opsional) Setup rclone, gog, dll via terminal
 ```
 
 ---
@@ -123,6 +152,7 @@ vim /root/.config/rclone/rclone.conf
 | Tool | Kegunaan |
 |------|----------|
 | `openclaw` | AI assistant via Telegram |
+| `gog` | [Google Suite CLI](https://github.com/steipete/gogcli) — Gmail, Calendar, Drive, Contacts, Sheets, Docs, dll |
 | `gemini` | Google Gemini CLI — AI coding assistant |
 | `vim` | Text editor |
 | `rclone` | Sync/transfer file ke cloud storage (GDrive, S3, dll) |
@@ -136,12 +166,27 @@ vim /root/.config/rclone/rclone.conf
 ## Perintah Berguna
 
 ```bash
+# OpenClaw
 openclaw onboard                          # Setup awal (pertama kali)
 openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
 openclaw doctor                           # Diagnostik
 openclaw update                           # Update ke versi terbaru
+
+# Rclone
 rclone lsd gdrive:                        # Test koneksi rclone
 rclone copy gdrive:folder /local/path     # Copy file dari cloud
+
+# Gog (Google Suite CLI)
+gog --version                             # Cek versi
+gog auth list                             # List akun yang tersimpan
+gog gmail labels list                     # List label Gmail
+gog gmail search "is:unread"              # Cari email
+gog gmail send --to a@b.com --subject Hi  # Kirim email
+gog calendar events                       # List event kalender
+gog drive ls                              # List file di Google Drive
+gog drive upload file.pdf                 # Upload file ke Drive
+gog contacts search "John"                # Cari kontak
+gog sheets read SPREADSHEET_ID            # Baca spreadsheet
 ```
 
 ---
@@ -158,6 +203,12 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 ├── gateway.log               ← Log gateway
 └── ... (config openclaw lainnya)
 ```
+
+> 💡 **Gog config** disimpan di `~/.config/gog/`. Jika ingin persist, symlink ke volume:
+> ```bash
+> mkdir -p /root/.openclaw/gog
+> ln -s /root/.openclaw/gog /root/.config/gog
+> ```
 
 ---
 
