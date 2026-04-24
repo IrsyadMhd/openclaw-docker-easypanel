@@ -1,29 +1,28 @@
 # =============================================================================
-# OpenClaw — Simple VPS-Style Container for ARM64 (EasyPanel)
+# QwenPaw — Simple Container for ARM64 (EasyPanel)
 # =============================================================================
-# Konsep: Container ini seperti VPS kosong yang sudah terinstall openclaw.
-# Tinggal exec ke terminal dan jalankan: openclaw onboard
+# Konsep: Container berisi QwenPaw (personal AI assistant dari AgentScope).
+# Setelah deploy, Console Web UI langsung bisa diakses di port 8088.
 #
-# Build:  docker build --platform linux/arm64 -t openclaw:arm64 .
-# Run:    docker run -d --name openclaw -p 18789:18789 openclaw:arm64
-# Exec:   docker exec -it openclaw bash
+# Build:  docker build --platform linux/arm64 -t qwenpaw:arm64 .
+# Run:    docker run -d --name qwenpaw -p 8088:8088 \
+#           -v qwenpaw-data:/app/working \
+#           -v qwenpaw-secrets:/app/working.secret \
+#           qwenpaw:arm64
+# Exec:   docker exec -it qwenpaw bash
 # =============================================================================
 
-FROM --platform=linux/arm64 node:22-bookworm
+FROM --platform=linux/arm64 python:3.12-slim-bookworm
 
-# Install essential tools (like a real VPS)
+# Install essential tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
       git \
-      nano \
       vim \
-      htop \
       procps \
-      rclone \
-      unzip \
-      python3 \
-      python3-pip \
+      ca-certificates \
+      tzdata \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,45 +30,36 @@ RUN apt-get update && \
 ENV TZ=Asia/Jakarta
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Rclone config — stored in persistent volume, symlinked to default path
-RUN mkdir -p /root/.openclaw/rclone /root/.config \
-    && ln -s /root/.openclaw/rclone /root/.config/rclone \
-    && touch /root/.openclaw/rclone/rclone.conf
+# QwenPaw runtime env
+ENV QWENPAW_WORKING_DIR=/app/working \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Install OpenClaw globally
-RUN npm install -g openclaw@2026.4.15
+# Install QwenPaw (pinned for reproducible builds — bump via build-arg)
+ARG QWENPAW_VERSION=1.1.3.post1
+RUN pip install "qwenpaw==${QWENPAW_VERSION}"
 
-# Install Python packages (baked into image, persists across restarts)
-RUN pip3 install --break-system-packages mysql-connector-python
+# Persistent data directories
+RUN mkdir -p /app/working /app/working.secret
 
-# Install gogcli (gog) — Google Suite CLI (Gmail, GCal, GDrive, Contacts, etc.)
-# https://github.com/steipete/gogcli
-ARG TARGETARCH
-ARG GOG_VERSION=0.12.0
-RUN curl -fsSL "https://github.com/steipete/gogcli/releases/download/v${GOG_VERSION}/gogcli_${GOG_VERSION}_linux_${TARGETARCH}.tar.gz" \
-      | tar -xz -C /usr/local/bin gog \
-    && chmod +x /usr/local/bin/gog
+WORKDIR /app
 
-# Create working directories
-RUN mkdir -p /root/.openclaw /root/.openclaw/workspace
+VOLUME ["/app/working", "/app/working.secret"]
 
-# Persistent data
-VOLUME ["/root/.openclaw"]
+EXPOSE 8088
 
-EXPOSE 18789
-
-# Try to start gateway (will work if onboarding is done, silently fail if not)
-# Guard: skip if port 18789 already bound (gateway already running)
-# Container stays alive either way — run "openclaw onboard" if first time
+# First run: initialize config with defaults (non-interactive).
+# Subsequent runs: start straight into the app since config already exists.
 CMD ["bash", "-c", "\
-  echo '🦞 OpenClaw container started.'; \
-  if ss -tlnp 2>/dev/null | grep -q ':18789'; then \
-    echo '⚠️  Gateway already running on port 18789, skipping...'; \
+  echo '🐾 QwenPaw container started.'; \
+  if [ ! -f /app/working/config.json ]; then \
+    echo '🔧 First run — initializing QwenPaw config...'; \
+    qwenpaw init --defaults --accept-security; \
   else \
-    openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
-    echo $! > /run/openclaw-gateway.pid; \
-    echo '🦞 Gateway launched (PID: '\"$!\"', logs: /root/.openclaw/gateway.log)'; \
+    echo '✅ Config found at /app/working/config.json — skipping init.'; \
   fi; \
-  echo '💡 First time? Run: openclaw onboard'; \
-
-  tail -f /dev/null"]
+  echo '🚀 Starting QwenPaw app on 0.0.0.0:8088...'; \
+  exec qwenpaw app --host 0.0.0.0 --port 8088 \
+"]

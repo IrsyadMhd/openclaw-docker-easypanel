@@ -1,9 +1,18 @@
-# 🦞 OpenClaw — Deploy ke EasyPanel (ARM64)
+# 🐾 QwenPaw — Deploy ke EasyPanel (ARM64)
+
+Container ringan untuk menjalankan [QwenPaw](https://qwenpaw.agentscope.io/) — personal AI assistant dari AgentScope — di VPS ARM64 via EasyPanel. Setelah deploy, buka Console Web UI di port `8088`, atur LLM provider & channel, lalu mulai chat.
+
+---
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
-Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
+- **Base image**: `python:3.12-slim-bookworm` (ARM64)
+- **QwenPaw** diinstall via `pip install qwenpaw==1.1.3.post1`
+- **Config & data persistent** di dua volume:
+  - `/app/working` → config utama (`config.json`, agents, skills, workspaces, log)
+  - `/app/working.secret` → file berisi secret (API key, token channel, dll)
+- **First run** otomatis menjalankan `qwenpaw init --defaults --accept-security` → tidak perlu interaksi saat deploy pertama.
+- **Subsequent runs** langsung menjalankan `qwenpaw app --host 0.0.0.0 --port 8088`.
 
 ---
 
@@ -11,139 +20,64 @@ Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup aw
 
 ### Langkah 1 — Buat Service
 
-1. Buka EasyPanel → **Create Service** → **App** → **GitHub**
-2. Arahkan ke repo ini
-3. **Dockerfile Path**: `Dockerfile`
-4. **Volume**: mount `/root/.openclaw` → agar data persistent (tidak hilang saat restart/rebuild)
-5. **Port**: ⚠️ **Tidak wajib** — hanya perlu jika ingin akses Control UI via web
-   - Jika butuh: Published `18789`, Target `18789`, Protocol `TCP`
-   - Jika tidak butuh akses web: **skip, jangan buat port**
-6. Klik **Deploy**, tunggu build selesai
+1. Buka EasyPanel → **Create Service** → **App** → **GitHub**.
+2. Arahkan ke repo ini.
+3. **Dockerfile Path**: `Dockerfile`.
+4. **Volume**: mount dua path agar data persistent:
+   - `/app/working`
+   - `/app/working.secret`
+5. **Port**:
+   - Published `8088`, Target `8088`, Protocol `TCP`.
+   - Wajib jika ingin akses Console Web UI dari browser.
+6. Klik **Deploy**, tunggu build selesai.
 
-### Langkah 2 — Onboarding (Pertama Kali Saja)
+### Langkah 2 — Buka Console Web UI
 
-1. Buka tab **Terminal** di EasyPanel
-2. Jalankan:
-   ```bash
-   openclaw onboard
-   ```
-3. Ikuti instruksi onboarding (setup Telegram bot, dll)
-4. Sampai muncul pesan:
-   ```
-   Onboarding complete. Use the dashboard link above to control OpenClaw.
-   ```
+Setelah container up, akses domain/port yang di-assign EasyPanel (mis. `https://qwenpaw.yourdomain.com` atau `http://<server-ip>:8088`).
 
-### Langkah 3 — Restart Container
+Di Console:
+1. **Configure LLM Provider** — masukkan API key (DashScope / OpenAI / Anthropic / dll).
+2. **Enable Skills** yang dibutuhkan (`pdf`, `cron`, `file_reader`, `browser_cdp`, dll).
+3. **Configure Channels** — pilih channel chat (DingTalk, Feishu, Discord, Telegram, WeChat, Console).
+4. Test chat via tab Console di UI atau via channel yang sudah aktif.
 
-> ⚠️ **PENTING**: Setelah onboarding selesai, **WAJIB restart container** agar gateway otomatis jalan.
+### Langkah 3 — (Opsional) Set Environment Variables
 
-1. Di EasyPanel → klik **Redeploy** atau **Restart** pada service OpenClaw
-2. Setelah restart, gateway akan **otomatis berjalan** di background
-3. Coba chat ke bot Telegram — seharusnya sudah merespons ✅
-
-### Langkah 4 — Setup Rclone (Opsional)
-
-Rclone sudah terinstall dan config file kosong sudah tersedia.
-Config disimpan di volume persistent (`/root/.openclaw/rclone/`), jadi **tidak hilang** saat rebuild.
-
-1. Buka Terminal di EasyPanel
-2. Edit config:
-   ```bash
-   vim /root/.config/rclone/rclone.conf
-   ```
-3. Isi konfigurasi rclone, contoh:
-   ```ini
-   [gdrive]
-   type = drive
-   team_drive =
-   token = {"access_token":"ya29.a0AT......."}
-   ```
-4. Simpan (`:wq`), lalu verifikasi:
-   ```bash
-   rclone lsd gdrive:
-   ```
-
-### Langkah 5 — Setup Gog CLI (Opsional)
-
-[`gog`](https://github.com/steipete/gogcli) adalah CLI untuk Google Suite — Gmail, Calendar, Drive, Contacts, Sheets, Docs, dan lainnya. Sudah terinstall di container.
-
-1. **Buat OAuth2 Credentials** di [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
-   - Buat project → Enable API yang dibutuhkan (Gmail, Drive, Calendar, dll)
-   - Buat OAuth client (Desktop app) → Download JSON file
-
-2. **Upload credentials** ke container (via rclone, scp, atau paste manual):
-   ```bash
-   # Simpan credentials
-   gog auth credentials /path/to/client_secret_xxx.json
-   ```
-
-3. **Tambah akun Google** (headless/remote flow untuk server tanpa browser):
-   ```bash
-   # Manual flow — cocok untuk server tanpa browser
-   gog auth add you@gmail.com --services user --manual
-   # CLI akan print URL → buka di browser lokal → paste redirect URL kembali
-   ```
-
-4. **Test**:
-   ```bash
-   export GOG_ACCOUNT=you@gmail.com
-   gog gmail labels list
-   ```
-
-> 💡 **Tips**: Gunakan `--manual` atau `--remote` flag saat `auth add`, karena container tidak punya browser.
-
-### Setelah Restart — Verifikasi
-
-Buka Terminal di EasyPanel, cek gateway berjalan:
+Kalau ingin pass API key via env (lebih aman daripada di Console), set di EasyPanel → Service → Environment:
 
 ```bash
-ps aux | grep openclaw
+DASHSCOPE_API_KEY=sk-xxx
+OPENAI_API_KEY=sk-xxx
+ANTHROPIC_API_KEY=sk-xxx
+GITHUB_TOKEN=ghp_xxx            # untuk import skill dari GitHub
+QWENPAW_AUTH_ENABLED=true       # aktifkan auth Console (rekomendasi kalau expose ke publik)
+QWENPAW_LOG_LEVEL=info
 ```
 
-Jika ada proses `openclaw-gateway`, berarti sudah jalan. ✅
+Restart service setelah set env.
 
 ---
 
-## Alur Ringkasan
-
-```
-Deploy Container
-    ↓
-Container Start → Gateway GAGAL (belum onboarding) → Container tetap hidup
-    ↓
-Buka Terminal → openclaw onboard
-    ↓
-Onboarding Selesai
-    ↓
-⚠️ RESTART Container di EasyPanel
-    ↓
-Container Start → Gateway BERHASIL (config sudah ada) ✅
-    ↓
-Bot Telegram aktif, siap digunakan 🎉
-    ↓
-(Opsional) Setup rclone, gog, dll via terminal
-```
-
----
-
-## Deploy via Docker Compose (Opsional)
+## Deploy via Docker (di luar EasyPanel)
 
 ```bash
-# 1. Build & jalankan
-docker compose up -d
+# Build untuk ARM64 (skip --platform kalau host-nya sudah arm64)
+docker build --platform linux/arm64 -t qwenpaw:arm64 .
 
-# 2. Masuk ke terminal container
-docker exec -it openclaw bash
+# Run dengan volume persistent
+docker run -d \
+  --name qwenpaw \
+  --restart unless-stopped \
+  -p 8088:8088 \
+  -v qwenpaw-data:/app/working \
+  -v qwenpaw-secrets:/app/working.secret \
+  qwenpaw:arm64
 
-# 3. Jalankan onboarding
-openclaw onboard
-
-# 4. Restart container setelah onboarding
-docker restart openclaw
-
-# 5. (Opsional) Setup rclone
-vim /root/.config/rclone/rclone.conf
+# Masuk terminal container
+docker exec -it qwenpaw bash
 ```
+
+Buka `http://127.0.0.1:8088/` di browser.
 
 ---
 
@@ -151,64 +85,113 @@ vim /root/.config/rclone/rclone.conf
 
 | Tool | Kegunaan |
 |------|----------|
-| `openclaw` | AI assistant via Telegram |
-| `gog` | [Google Suite CLI](https://github.com/steipete/gogcli) — Gmail, Calendar, Drive, Contacts, Sheets, Docs, dll |
-| `gemini` | Google Gemini CLI — AI coding assistant |
+| `qwenpaw` | CLI QwenPaw (app, init, cron, skills, channels, agents) |
+| `python3` / `pip` | Runtime Python |
 | `vim` | Text editor |
-| `rclone` | Sync/transfer file ke cloud storage (GDrive, S3, dll) |
-| `nano` | Text editor alternatif |
-| `git` | Version control |
-| `htop` | Monitor proses |
+| `git` | Version control (dipakai saat install skill dari GitHub) |
 | `curl` | HTTP request |
+| `htop` (via `procps`) | `ps`, `top` dasar |
+
+Tidak ada `rclone`, `gog`, `gemini`, atau `node` — image sengaja dibuat minimal. Tambahkan sendiri via `apt-get` / `pip` jika dibutuhkan skill tertentu.
 
 ---
 
 ## Perintah Berguna
 
 ```bash
-# OpenClaw
-openclaw onboard                          # Setup awal (pertama kali)
-openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
-openclaw doctor                           # Diagnostik
-openclaw update                           # Update ke versi terbaru
+# Cek versi
+qwenpaw --version
 
-# Rclone
-rclone lsd gdrive:                        # Test koneksi rclone
-rclone copy gdrive:folder /local/path     # Copy file dari cloud
+# Re-init config (hati-hati, --force akan overwrite)
+qwenpaw init --defaults --force --accept-security
 
-# Gog (Google Suite CLI)
-gog --version                             # Cek versi
-gog auth list                             # List akun yang tersimpan
-gog gmail labels list                     # List label Gmail
-gog gmail search "is:unread"              # Cari email
-gog gmail send --to a@b.com --subject Hi  # Kirim email
-gog calendar events                       # List event kalender
-gog drive ls                              # List file di Google Drive
-gog drive upload file.pdf                 # Upload file ke Drive
-gog contacts search "John"                # Cari kontak
-gog sheets read SPREADSHEET_ID            # Baca spreadsheet
+# List agents
+qwenpaw agents list
+
+# List & enable skills
+qwenpaw skills list --agent-id default
+qwenpaw skills config --agent-id default
+
+# List & configure channels
+qwenpaw channels list --agent-id default
+qwenpaw channels config --agent-id default
+
+# Cron jobs
+qwenpaw cron list --agent-id default
+qwenpaw cron create --agent-id default \
+  --type text \
+  --name "Daily Greeting" \
+  --cron "0 9 * * *" \
+  --channel console \
+  --target-user "alice" \
+  --target-session "session_001" \
+  --text "Selamat pagi!"
+
+# Send message ad-hoc lewat channel
+qwenpaw channels send \
+  --agent-id default \
+  --channel console \
+  --target-user alice \
+  --target-session alice_session_001 \
+  --text "Halo dari QwenPaw!"
 ```
 
 ---
 
 ## Struktur Persistent Data
 
-Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
+Semua state di-persist lewat dua volume:
 
 ```
-/root/.openclaw/
-├── rclone/
-│   └── rclone.conf          ← Config rclone (symlink ke /root/.config/rclone/)
-├── workspace/                ← Working directory openclaw
-├── gateway.log               ← Log gateway
-└── ... (config openclaw lainnya)
+/app/working/                    ← volume qwenpaw-data
+├── config.json                   # Config utama
+├── HEARTBEAT.md                  # File heartbeat default agent
+├── agents/                       # Per-agent config
+├── workspaces/
+│   └── default/
+│       ├── skill.json            # Skill manifest per workspace
+│       └── skills/               # Runtime skills aktif
+└── skill_pool/                   # Shared skill repository
+
+/app/working.secret/              ← volume qwenpaw-secrets
+└── ...                           # API key, token channel, OAuth credentials
 ```
 
-> 💡 **Gog config** disimpan di `~/.config/gog/`. Jika ingin persist, symlink ke volume:
-> ```bash
-> mkdir -p /root/.openclaw/gog
-> ln -s /root/.openclaw/gog /root/.config/gog
-> ```
+> 💡 Pisahkan dua volume agar data non-sensitif (`working`) bisa di-backup terpisah tanpa ikut expose secret.
+
+---
+
+## HTTP API (Ringkas)
+
+Setelah container running, selain Console Web UI, semua kontrol bisa lewat REST API di `http://<host>:8088`:
+
+```bash
+# List agents
+curl -s http://localhost:8088/api/agents
+
+# Configure LLM provider
+curl -X PUT http://localhost:8088/api/models/dashscope/config \
+  -H "Content-Type: application/json" \
+  -d '{"api_key": "sk-xxx"}'
+
+# Set active model (global)
+curl -X PUT http://localhost:8088/api/models/active \
+  -H "Content-Type: application/json" \
+  -d '{"provider_id": "dashscope", "model": "qwen-max", "scope": "global"}'
+
+# Send message dari luar
+curl -X POST http://localhost:8088/api/messages/send \
+  -H "Content-Type: application/json" \
+  -H "X-Agent-Id: default" \
+  -d '{
+    "channel": "console",
+    "target_user": "alice",
+    "target_session": "session_001",
+    "text": "Hello from API!"
+  }'
+```
+
+Docs lengkap: https://qwenpaw.agentscope.io/
 
 ---
 
@@ -216,11 +199,17 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 
 | Masalah | Solusi |
 |---------|--------|
-| Bot Telegram tidak merespons | Pastikan gateway jalan: `ps aux \| grep openclaw`. Jika tidak ada, restart container atau jalankan `openclaw gateway &` |
-| Container exit sendiri | Pastikan `restart: unless-stopped` aktif |
-| Port tidak bisa diakses | Pastikan gateway bind ke `lan`: `openclaw gateway --port 18789 --bind lan &` |
-| Perlu update openclaw | Masuk terminal → `npm install -g openclaw@latest` |
-| Cek log gateway | `cat /root/.openclaw/gateway.log` |
-| Onboarding sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
-| Rclone config hilang setelah rebuild | Seharusnya tidak, karena disimpan di volume. Cek volume mount di EasyPanel |
-| Rclone error "config not found" | Cek symlink: `ls -la /root/.config/rclone/` |
+| Container exit setelah start | Cek log container: kemungkinan `pip install qwenpaw` gagal atau port 8088 bentrok. |
+| Console tidak bisa dibuka dari browser | Pastikan port 8088 sudah di-publish di EasyPanel dan `qwenpaw app --host 0.0.0.0` (default di Dockerfile ini). |
+| Config hilang saat rebuild | Pastikan volume `/app/working` dan `/app/working.secret` benar-benar di-mount di EasyPanel. |
+| LLM request gagal | Cek API key di Console → Models, atau set env var `DASHSCOPE_API_KEY` / `OPENAI_API_KEY`. |
+| Update QwenPaw ke versi terbaru | Edit `ARG QWENPAW_VERSION` di `Dockerfile`, atau pass `--build-arg QWENPAW_VERSION=x.y.z` saat build, lalu Redeploy di EasyPanel. |
+| Install skill custom | Lewat Console UI → Skills Hub, atau `POST /api/skills/hub/install/start`. |
+| Channel Telegram/Discord tidak terima pesan | Pastikan bot token benar, `enabled: true`, dan restart container setelah update config. |
+
+---
+
+## Lisensi & Kredit
+
+- QwenPaw © AgentScope — https://github.com/agentscope-ai/QwenPaw
+- Dockerfile & deploy recipe: IrsyadMhd
