@@ -37,9 +37,26 @@ ENV QWENPAW_WORKING_DIR=/app/working \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# Install Node.js 22 LTS — required by ACP coding-agent CLIs (Kilo Code,
+# claude-agent-acp, codex-acp) that QwenPaw spawns via `delegate_external_agent`.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    npm config set fund false && npm config set update-notifier false
+
 # Install QwenPaw (pinned for reproducible builds — bump via build-arg)
-ARG QWENPAW_VERSION=1.1.3.post1
+ARG QWENPAW_VERSION=1.1.4.post1
 RUN pip install "qwenpaw==${QWENPAW_VERSION}"
+
+# Install Kilo Code CLI + its ACP adapter so QwenPaw can delegate coding tasks.
+#   - @kilocode/cli  → `kilo` TUI / `kilo run "..."` one-off
+#   - kilo-acp       → ACP bridge spawned by QwenPaw's `delegate_external_agent`
+# Bump versions via build-arg if needed.
+ARG KILOCODE_CLI_VERSION=latest
+ARG KILO_ACP_VERSION=latest
+RUN npm install -g \
+      "@kilocode/cli@${KILOCODE_CLI_VERSION}" \
+      "kilo-acp@${KILO_ACP_VERSION}"
 
 # Persistent data directories
 RUN mkdir -p /app/working /app/working.secret

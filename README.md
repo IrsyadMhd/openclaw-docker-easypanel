@@ -7,7 +7,8 @@ Container ringan untuk menjalankan [QwenPaw](https://qwenpaw.agentscope.io/) —
 ## Konsep
 
 - **Base image**: `python:3.12-slim-bookworm` (ARM64)
-- **QwenPaw** diinstall via `pip install qwenpaw==1.1.3.post1`
+- **QwenPaw** diinstall via `pip install qwenpaw==1.1.4.post1`
+- **Node.js 22 LTS** + **Kilo Code CLI** (`@kilocode/cli`) + **kilo-acp** ikut di-bake ke image → QwenPaw bisa delegasi tugas coding ke external agent via fitur ACP-as-tool.
 - **Config & data persistent** di dua volume:
   - `/app/working` → config utama (`config.json`, agents, skills, workspaces, log)
   - `/app/working.secret` → file berisi secret (API key, token channel, dll)
@@ -87,12 +88,15 @@ Buka `http://127.0.0.1:8088/` di browser.
 |------|----------|
 | `qwenpaw` | CLI QwenPaw (app, init, cron, skills, channels, agents) |
 | `python3` / `pip` | Runtime Python |
+| `node` / `npm` / `npx` | Runtime Node.js 22 LTS — dipakai oleh Kilo Code CLI dan ACP runner berbasis npx (claude-agent-acp, codex-acp) |
+| `kilo` | [Kilo Code CLI](https://kilo.ai/cli) — TUI coding agent (`kilo`, `kilo run "..."`, `kilo /connect`) |
+| `kilo-acp` | ACP adapter Kilo Code — dipanggil QwenPaw saat delegasi tugas coding |
 | `vim` | Text editor |
 | `git` | Version control (dipakai saat install skill dari GitHub) |
 | `curl` | HTTP request |
 | `htop` (via `procps`) | `ps`, `top` dasar |
 
-Tidak ada `rclone`, `gog`, `gemini`, atau `node` — image sengaja dibuat minimal. Tambahkan sendiri via `apt-get` / `pip` jika dibutuhkan skill tertentu.
+Tidak ada `rclone`, `gog`, atau `gemini` — image sengaja dibuat minimal. Tambahkan sendiri via `apt-get` / `pip` / `npm` jika dibutuhkan skill tertentu.
 
 ---
 
@@ -161,6 +165,121 @@ Semua state di-persist lewat dua volume:
 
 ---
 
+## ACP — Delegasi Tugas Coding ke External Agent
+
+Mulai QwenPaw v1.1.x ada built-in tool `delegate_external_agent` yang membiarkan bot QwenPaw "memanggil" coding agent lain (Kilo Code, Claude Code, OpenCode, Codex, Qwen Code) lewat ACP (Agent Client Protocol). Image ini sudah include Node.js + Kilo Code CLI supaya fitur tersebut langsung bisa dipakai.
+
+### Kenapa bot awalnya bilang "tidak tahu apa itu ACP"
+
+Tool `delegate_external_agent` **disabled by default** di toolkit setiap agent — jadi LLM literal tidak punya tool tersebut sebelum kamu aktifkan. Lihat [PR #3340](https://github.com/agentscope-ai/QwenPaw/pull/3340).
+
+### Aktifkan tool di Console
+
+1. Buka Console QwenPaw → pilih agent (mis. `default`).
+2. Buka tab **Tools** / **Builtin Tools** → cari `delegate_external_agent` → toggle **enabled**.
+3. Save → mulai sesi chat baru.
+
+Alternatif: edit `agent.json` di `/app/working/agents/<agent_id>/agent.json` lalu restart container.
+
+### Daftar runner default (sudah ter-konfigurasi di QwenPaw 1.1.4.post1)
+
+Semua sudah `enabled: true` di `config.acp.agents`:
+
+| Runner | Command yang dipanggil | Keterangan |
+|--------|------------------------|------------|
+| `opencode` | `opencode acp` | Perlu install [OpenCode CLI](https://opencode.ai) sendiri (`npm i -g opencode-ai`). |
+| `qwen_code` | `qwen --acp` | Perlu install [Qwen Code CLI](https://github.com/QwenLM/qwen-code) (`npm i -g @qwen-code/qwen-code`). |
+| `claude_code` | `npx -y @zed-industries/claude-agent-acp` | Auto-download via npx pertama kali. Perlu `ANTHROPIC_API_KEY`. |
+| `codex` | `npx -y @zed-industries/codex-acp` | Auto-download via npx pertama kali. Perlu `OPENAI_API_KEY`. |
+
+### Tambahkan Kilo Code sebagai custom runner
+
+Kilo Code belum termasuk default QwenPaw, jadi tambahkan manual ke `config.json`:
+
+```jsonc
+// /app/working/config.json
+{
+  "acp": {
+    "agents": {
+      "kilo_code": {
+        "enabled": true,
+        "command": "kilo-acp",
+        "args": [],
+        "trusted": true,
+        "tool_parse_mode": "update_detail"
+      }
+    }
+  }
+}
+```
+
+Lalu **Restart** service. Field lain (opencode, qwen_code, claude_code, codex) tidak perlu disebut — QwenPaw akan auto-merge default-nya.
+
+### Setup awal Kilo Code (sekali saja)
+
+Kilo perlu di-authenticate ke provider model (OpenAI / Anthropic / Kilo Cloud / dll). Cara paling cepat — lewat terminal container:
+
+```bash
+# Masuk shell container (EasyPanel → Terminal, atau `docker exec -it qwenpaw bash`)
+kilo
+# Di TUI Kilo, ketik:
+#   /connect
+# → ikuti wizard untuk pilih provider & isi API key.
+# Keluar dengan Ctrl+C → credential tersimpan di /root/.kilocode/ (volume tidak persistent!).
+```
+
+> ⚠️ **Penting**: `/root/.kilocode/` belum dimount sebagai volume. Setelah container redeploy, kredensial Kilo hilang dan harus `/connect` ulang. Workaround:
+> - Tambahkan volume mount `/root/.kilocode` di EasyPanel.
+> - Atau set env var Kilo (mis. `KILOCODE_API_KEY=...`, cek `kilo --help` versi terbaru).
+
+Untuk runner lain, set env var di EasyPanel:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...   # claude_code
+OPENAI_API_KEY=sk-...           # codex
+DASHSCOPE_API_KEY=sk-...        # qwen_code
+# opencode pakai login provider sendiri — jalankan `opencode auth` di terminal
+```
+
+### Beri tahu bot kapan harus pakai
+
+LLM tidak otomatis tahu kapan harus delegate. Tambahkan instruksi di `PROFILE.md` agent (`/app/working/agents/<agent_id>/PROFILE.md` atau lewat Console → Files):
+
+```markdown
+Kalau user minta bantuan ngoding (membuat/edit/menjelaskan kode, debug,
+refactor, generate proyek), gunakan tool `delegate_external_agent` untuk
+mendelegasikan tugas ke external coding agent.
+
+Runner yang tersedia:
+- `kilo_code`  — default untuk semua tugas coding (TUI Kilo Code, support 500+ model)
+- `claude_code` — untuk reasoning kompleks / refactor besar
+- `codex`       — untuk integrasi OpenAI
+- `qwen_code`   — untuk task ringan & cepat
+- `opencode`    — alternatif open-source
+
+Protokol pakai:
+  delegate_external_agent(action="start",   runner="kilo_code", message="<tugas detail>")
+  delegate_external_agent(action="message", runner="kilo_code", message="<follow-up>")
+  delegate_external_agent(action="respond", runner="kilo_code", message="<id-opsi-yang-diminta>")
+  delegate_external_agent(action="close",   runner="kilo_code")
+
+Selalu tutup sesi (`close`) setelah selesai supaya proses anak tidak menumpuk.
+```
+
+Save → mulai sesi chat baru → sekarang bot akan tahu cara pakai Kilo & teman-temannya.
+
+### Verifikasi cepat dari terminal
+
+```bash
+node --version            # v22.x
+npm --version
+kilo --version            # Kilo Code CLI
+which kilo-acp            # /usr/lib/node_modules/.bin/kilo-acp atau /usr/bin/kilo-acp
+qwenpaw --version         # 1.1.4.post1
+```
+
+---
+
 ## HTTP API (Ringkas)
 
 Setelah container running, selain Console Web UI, semua kontrol bisa lewat REST API di `http://<host>:8088`:
@@ -206,6 +325,10 @@ Docs lengkap: https://qwenpaw.agentscope.io/
 | Update QwenPaw ke versi terbaru | Edit `ARG QWENPAW_VERSION` di `Dockerfile`, atau pass `--build-arg QWENPAW_VERSION=x.y.z` saat build, lalu Redeploy di EasyPanel. |
 | Install skill custom | Lewat Console UI → Skills Hub, atau `POST /api/skills/hub/install/start`. |
 | Channel Telegram/Discord tidak terima pesan | Pastikan bot token benar, `enabled: true`, dan restart container setelah update config. |
+| Bot bilang tidak tahu ACP / tidak pakai coding tool | `delegate_external_agent` masih disabled — aktifkan di Console → Tools, lalu restart sesi chat. Lihat bagian [ACP](#acp--delegasi-tugas-coding-ke-external-agent). |
+| `kilo: command not found` di terminal | Image lama tanpa Node/Kilo. Rebuild dari Dockerfile terbaru di branch `qwenpaw`. |
+| `kilo /connect` butuh login berulang setelah redeploy | Mount `/root/.kilocode` sebagai volume di EasyPanel agar kredensial persistent. |
+| `delegate_external_agent` error "command not found: kilo-acp" | Custom runner `kilo_code` belum ditambahkan ke `config.json` (lihat bagian ACP), atau `kilo-acp` tidak terinstall (rebuild image). |
 
 ---
 
