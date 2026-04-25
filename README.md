@@ -246,14 +246,87 @@ OPENAI_API_KEY=sk-...           # codex
 DASHSCOPE_API_KEY=sk-...        # qwen_code
 ```
 
-Untuk OpenCode, login provider lewat terminal container (kredensial disimpan di `~/.opencode/`):
+Untuk OpenCode, login provider lewat terminal container (kredensial disimpan di `~/.local/share/opencode/auth.json`):
 
 ```bash
 docker exec -it qwenpaw bash
 opencode auth login    # ikuti wizard pilih provider
 ```
 
-> ⚠️ Sama seperti `~/.kilocode/`, direktori `~/.opencode/` dan `~/.claude/` belum dimount sebagai volume. Mount manual di EasyPanel kalau mau persistent setelah redeploy.
+> ⚠️ Sama seperti `~/.kilocode/`, direktori `~/.local/share/opencode/`, `~/.config/opencode/`, dan `~/.claude/` belum dimount sebagai volume. Mount manual di EasyPanel kalau mau persistent setelah redeploy. Lihat tabel volume di section [Pakai Custom Provider](#pakai-custom-provider-openai--anthropic-compatible).
+
+### Pakai Custom Provider (OpenAI / Anthropic-compatible)
+
+Semua coding agent CLI di image ini support endpoint pihak ketiga yang OpenAI-compatible (mis. Together AI, Groq, Perplexity, OpenRouter, LiteLLM, Ollama, LM Studio, MiniMax) atau Anthropic-compatible (mis. AWS Bedrock proxy, Z.ai, MiniMax). Setiap tool punya mekanisme sendiri — ringkasan:
+
+#### Claude Code & `claude-agent-acp` — env var (paling simpel)
+
+Kedua tool pakai Anthropic SDK resmi yang menghormati env var standar. Set di EasyPanel → Service → Environment:
+
+```bash
+ANTHROPIC_BASE_URL=https://your-provider.example.com/anthropic   # endpoint Anthropic-compat
+ANTHROPIC_AUTH_TOKEN=<API_KEY_PROVIDER>                          # bukan ANTHROPIC_API_KEY
+ANTHROPIC_MODEL=<model-id-yang-disediakan-provider>              # opsional, paksa model tertentu
+```
+
+Gunakan `ANTHROPIC_AUTH_TOKEN` (bukan `ANTHROPIC_API_KEY`) untuk third-party Anthropic-compat. `claude-agent-acp` di-spawn QwenPaw via `npx` dan mewarisi env container, jadi ACP delegasi otomatis kebaca env yang sama.
+
+Verifikasi: `docker exec -it qwenpaw bash -lc 'claude -p "ping, jawab dengan satu kata"'`. Reference: <https://code.claude.com/docs/en/env-vars.md>.
+
+#### Kilo Code — lewat `/connect` (atau edit `~/.kilocode/`)
+
+Kilo tidak baca env var Anthropic / OpenAI standar. Konfigurasi lewat TUI:
+
+```bash
+docker exec -it qwenpaw bash
+kilo            # masuk TUI
+/connect        # pilih:
+#   • "OpenAI Compatible" → isi Base URL, API Key, Model ID provider kamu
+#   • "Anthropic"          → kalau provider-mu support endpoint Anthropic-compat
+```
+
+Kredensial tersimpan di `/root/.kilocode/`. **Mount path ini sebagai volume di EasyPanel** supaya tidak hilang saat redeploy. Reference: <https://kilo.ai/docs/ai-providers/openai-compatible>.
+
+#### OpenCode — `opencode.json` + `{env:VAR_NAME}` placeholder (paling stateless)
+
+Definisikan custom provider di `/root/.config/opencode/opencode.json` dan reference API key dari env var:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "my-openai-compat": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "My OpenAI-compatible Provider",
+      "options": {
+        "baseURL": "https://your-provider.example.com/v1",
+        "apiKey": "{env:MY_PROVIDER_API_KEY}"
+      },
+      "models": {
+        "model-id-1": { "name": "Model 1" },
+        "model-id-2": { "name": "Model 2" }
+      }
+    }
+  }
+}
+```
+
+Untuk endpoint Anthropic-compat, ganti `npm` jadi `@ai-sdk/anthropic` dan tambah `baseURL` di `options`. Set env `MY_PROVIDER_API_KEY=...` di EasyPanel — tidak perlu file kredensial yang harus di-mount. Reference: <https://opencode.ai/docs/providers/>.
+
+#### Volume mount yang disarankan
+
+Karena Dockerfile ini hanya declare 2 volume default, tambahkan mount berikut di EasyPanel (Service → Volumes) supaya kredensial coding-agent persistent:
+
+| Source / nama volume | Target di container | Untuk |
+|---|---|---|
+| `qwenpaw-data` | `/app/working` | (default) config QwenPaw |
+| `qwenpaw-secrets` | `/app/working.secret` | (default) secret QwenPaw |
+| `qwenpaw-kilo` | `/root/.kilocode` | Kilo Code provider config + sessions |
+| `qwenpaw-claude` | `/root/.claude` | Claude Code settings (opsional kalau pakai env var) |
+| `qwenpaw-opencode-cfg` | `/root/.config/opencode` | OpenCode config (`opencode.json`) |
+| `qwenpaw-opencode-data` | `/root/.local/share/opencode` | OpenCode auth (`auth.json`) |
+
+Kalau pakai pendekatan **env var + `{env:...}` placeholder** (Claude Code & OpenCode), 4 volume bawah opsional — tinggal Kilo yang wajib mount karena dia tidak baca env standar.
 
 ### Beri tahu bot kapan harus pakai
 
@@ -346,6 +419,8 @@ Docs lengkap: https://qwenpaw.agentscope.io/
 | `kilo: command not found` di terminal | Image lama tanpa Node/Kilo. Rebuild dari Dockerfile terbaru di branch `qwenpaw`. |
 | `kilo /connect` butuh login berulang setelah redeploy | Mount `/root/.kilocode` sebagai volume di EasyPanel agar kredensial persistent. |
 | `delegate_external_agent` error "command not found: kilo-acp" | Custom runner `kilo_code` belum ditambahkan ke `config.json` (lihat bagian ACP), atau `kilo-acp` tidak terinstall (rebuild image). |
+| Claude Code error 401 / "Invalid API key" walau key di-set | Pakai `ANTHROPIC_AUTH_TOKEN` (bukan `ANTHROPIC_API_KEY`) untuk third-party Anthropic-compat provider. Cek juga `ANTHROPIC_BASE_URL` mengarah ke endpoint yang benar. |
+| OpenCode tidak ketemu custom provider | Pastikan `opencode.json` ada di `/root/.config/opencode/opencode.json` dan field `npm` valid (`@ai-sdk/openai-compatible` atau `@ai-sdk/anthropic`). Restart container biar OpenCode reload config. |
 
 ---
 
