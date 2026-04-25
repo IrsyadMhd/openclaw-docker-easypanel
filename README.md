@@ -8,7 +8,10 @@ Container ringan untuk menjalankan [QwenPaw](https://qwenpaw.agentscope.io/) —
 
 - **Base image**: `python:3.12-slim-bookworm` (ARM64)
 - **QwenPaw** diinstall via `pip install qwenpaw==1.1.4.post1`
-- **Node.js 22 LTS** + **Kilo Code CLI** (`@kilocode/cli`) + **kilo-acp** ikut di-bake ke image → QwenPaw bisa delegasi tugas coding ke external agent via fitur ACP-as-tool.
+- **Node.js 22 LTS** + ACP coding-agent CLIs ikut di-bake ke image → QwenPaw bisa langsung delegasi tugas coding ke external agent via fitur ACP-as-tool. Yang sudah pre-installed:
+  - `@kilocode/cli` (`kilo`) + `kilo-acp` — untuk custom runner `kilo_code`.
+  - `@anthropic-ai/claude-code` (`claude`) + `@zed-industries/claude-agent-acp` — untuk runner default `claude_code`.
+  - `opencode-ai` (`opencode`) — untuk runner default `opencode`.
 - **Config & data persistent** di dua volume:
   - `/app/working` → config utama (`config.json`, agents, skills, workspaces, log)
   - `/app/working.secret` → file berisi secret (API key, token channel, dll)
@@ -90,7 +93,10 @@ Buka `http://127.0.0.1:8088/` di browser.
 | `python3` / `pip` | Runtime Python |
 | `node` / `npm` / `npx` | Runtime Node.js 22 LTS — dipakai oleh Kilo Code CLI dan ACP runner berbasis npx (claude-agent-acp, codex-acp) |
 | `kilo` | [Kilo Code CLI](https://kilo.ai/cli) — TUI coding agent (`kilo`, `kilo run "..."`, `kilo /connect`) |
-| `kilo-acp` | ACP adapter Kilo Code — dipanggil QwenPaw saat delegasi tugas coding |
+| `kilo-acp` | ACP adapter Kilo Code — dipanggil QwenPaw untuk runner `kilo_code` |
+| `claude` | [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) — TUI coding agent dari Anthropic |
+| `claude-agent-acp` | ACP adapter Claude Code (`@zed-industries/claude-agent-acp`) — dipanggil QwenPaw untuk runner `claude_code` |
+| `opencode` | [OpenCode](https://opencode.ai) — TUI coding agent open source. Dipakai langsung untuk runner `opencode` (`opencode acp`) |
 | `vim` | Text editor |
 | `git` | Version control (dipakai saat install skill dari GitHub) |
 | `curl` | HTTP request |
@@ -187,10 +193,10 @@ Semua sudah `enabled: true` di `config.acp.agents`:
 
 | Runner | Command yang dipanggil | Keterangan |
 |--------|------------------------|------------|
-| `opencode` | `opencode acp` | Perlu install [OpenCode CLI](https://opencode.ai) sendiri (`npm i -g opencode-ai`). |
-| `qwen_code` | `qwen --acp` | Perlu install [Qwen Code CLI](https://github.com/QwenLM/qwen-code) (`npm i -g @qwen-code/qwen-code`). |
-| `claude_code` | `npx -y @zed-industries/claude-agent-acp` | Auto-download via npx pertama kali. Perlu `ANTHROPIC_API_KEY`. |
-| `codex` | `npx -y @zed-industries/codex-acp` | Auto-download via npx pertama kali. Perlu `OPENAI_API_KEY`. |
+| `opencode` | `opencode acp` | ✅ `opencode-ai` sudah pre-installed di image ini. Login provider via `opencode auth` di terminal. |
+| `claude_code` | `npx -y @zed-industries/claude-agent-acp` | ✅ ACP adapter sudah pre-installed (npx tetap pakai versi global yang di-cache). Set env `ANTHROPIC_API_KEY`. |
+| `codex` | `npx -y @zed-industries/codex-acp` | ⚠️ Belum pre-installed — npx akan download saat panggilan pertama. Set env `OPENAI_API_KEY`. Kalau mau pre-install, tambah `@zed-industries/codex-acp` di Dockerfile. |
+| `qwen_code` | `qwen --acp` | ⚠️ Belum pre-installed — install manual dengan `npm i -g @qwen-code/qwen-code` di terminal container, atau tambahkan ke Dockerfile. |
 
 ### Tambahkan Kilo Code sebagai custom runner
 
@@ -235,11 +241,19 @@ kilo
 Untuk runner lain, set env var di EasyPanel:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...   # claude_code
+ANTHROPIC_API_KEY=sk-ant-...   # claude_code (langsung dipakai claude-agent-acp)
 OPENAI_API_KEY=sk-...           # codex
 DASHSCOPE_API_KEY=sk-...        # qwen_code
-# opencode pakai login provider sendiri — jalankan `opencode auth` di terminal
 ```
+
+Untuk OpenCode, login provider lewat terminal container (kredensial disimpan di `~/.opencode/`):
+
+```bash
+docker exec -it qwenpaw bash
+opencode auth login    # ikuti wizard pilih provider
+```
+
+> ⚠️ Sama seperti `~/.kilocode/`, direktori `~/.opencode/` dan `~/.claude/` belum dimount sebagai volume. Mount manual di EasyPanel kalau mau persistent setelah redeploy.
 
 ### Beri tahu bot kapan harus pakai
 
@@ -274,7 +288,10 @@ Save → mulai sesi chat baru → sekarang bot akan tahu cara pakai Kilo & teman
 node --version            # v22.x
 npm --version
 kilo --version            # Kilo Code CLI
-which kilo-acp            # /usr/lib/node_modules/.bin/kilo-acp atau /usr/bin/kilo-acp
+which kilo-acp            # /usr/bin/kilo-acp atau /usr/lib/node_modules/...
+claude --version          # Claude Code CLI dari Anthropic
+which claude-agent-acp    # /usr/bin/claude-agent-acp
+opencode --version        # OpenCode CLI
 qwenpaw --version         # 1.1.4.post1
 ```
 

@@ -48,15 +48,25 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 ARG QWENPAW_VERSION=1.1.4.post1
 RUN pip install "qwenpaw==${QWENPAW_VERSION}"
 
-# Install Kilo Code CLI + its ACP adapter so QwenPaw can delegate coding tasks.
-#   - @kilocode/cli  → `kilo` TUI / `kilo run "..."` one-off
-#   - kilo-acp       → ACP bridge spawned by QwenPaw's `delegate_external_agent`
-# Bump versions via build-arg if needed.
+# Install ACP coding-agent CLIs so QwenPaw's `delegate_external_agent` can
+# spawn them out-of-the-box (no first-call npx download delay).
+#   - @kilocode/cli                    → `kilo` TUI (custom runner kilo_code)
+#   - kilo-acp                         → ACP bridge for kilo_code
+#   - @anthropic-ai/claude-code        → `claude` CLI (Anthropic Claude Code)
+#   - @zed-industries/claude-agent-acp → ACP bridge used by default runner claude_code
+#   - opencode-ai                      → `opencode` binary used by default runner opencode
+# Bump individual versions via build-arg if needed.
 ARG KILOCODE_CLI_VERSION=latest
 ARG KILO_ACP_VERSION=latest
+ARG CLAUDE_CODE_VERSION=latest
+ARG CLAUDE_ACP_VERSION=latest
+ARG OPENCODE_VERSION=latest
 RUN npm install -g \
       "@kilocode/cli@${KILOCODE_CLI_VERSION}" \
-      "kilo-acp@${KILO_ACP_VERSION}"
+      "kilo-acp@${KILO_ACP_VERSION}" \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+      "@zed-industries/claude-agent-acp@${CLAUDE_ACP_VERSION}" \
+      "opencode-ai@${OPENCODE_VERSION}"
 
 # Persistent data directories
 RUN mkdir -p /app/working /app/working.secret
