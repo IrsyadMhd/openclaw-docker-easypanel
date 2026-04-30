@@ -2,7 +2,7 @@
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
+Container ini bekerja seperti **VPS** — sudah terinstall `openclaw` (v4.26), `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
 Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
 
 ---
@@ -31,6 +31,10 @@ Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup aw
 4. Sampai muncul pesan:
    ```
    Onboarding complete. Use the dashboard link above to control OpenClaw.
+   ```
+5. Jalankan perintah berikut untuk bersihkan config yang tidak kompatibel:
+   ```bash
+   openclaw doctor --fix
    ```
 
 ### Langkah 3 — Restart Container
@@ -168,9 +172,15 @@ vim /root/.config/rclone/rclone.conf
 ```bash
 # OpenClaw
 openclaw onboard                          # Setup awal (pertama kali)
+openclaw doctor --fix                     # Bersihkan config lama (wajib setelah upgrade)
 openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
 openclaw doctor                           # Diagnostik
-openclaw update                           # Update ke versi terbaru
+npm install -g openclaw@2026.4.26         # Update ke versi spesifik (cara aman)
+npm install -g openclaw@latest            # Update ke versi terbaru
+
+# Monitor resource container
+docker stats openclaw                     # Pantau CPU & RAM real-time
+cat /root/.openclaw/gateway.log           # Cek log gateway
 
 # Rclone
 rclone lsd gdrive:                        # Test koneksi rclone
@@ -219,8 +229,11 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 | Bot Telegram tidak merespons | Pastikan gateway jalan: `ps aux \| grep openclaw`. Jika tidak ada, restart container atau jalankan `openclaw gateway &` |
 | Container exit sendiri | Pastikan `restart: unless-stopped` aktif |
 | Port tidak bisa diakses | Pastikan gateway bind ke `lan`: `openclaw gateway --port 18789 --bind lan &` |
-| Perlu update openclaw | Masuk terminal → `npm install -g openclaw@latest` |
-| Cek log gateway | `cat /root/.openclaw/gateway.log` |
+| **CPU spike 100% saat chat** | Pastikan `OPENCLAW_NO_AUTO_UPDATE=1` ter-set. Cek log: `cat /root/.openclaw/gateway.log`. Jalankan `openclaw doctor --fix` |
+| **RAM bengkak >1.5GB** | Verifikasi `NODE_OPTIONS=--max-old-space-size=1200` aktif: `echo $NODE_OPTIONS`. Nilai ideal ~60% dari RAM container |
+| Config error setelah upgrade versi | Jalankan `openclaw doctor --fix` untuk auto-repair config yang tidak kompatibel |
+| Perlu update openclaw | Masuk terminal → `npm install -g openclaw@2026.4.26` (atau `@latest`) |
+| Cek log gateway | `cat /root/.openclaw/gateway.log` atau `tail -f /root/.openclaw/gateway.log` |
 | Onboarding sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
 | Rclone config hilang setelah rebuild | Seharusnya tidak, karena disimpan di volume. Cek volume mount di EasyPanel |
 | Rclone error "config not found" | Cek symlink: `ls -la /root/.config/rclone/` |
