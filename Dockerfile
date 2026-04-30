@@ -102,28 +102,38 @@ RUN mkdir -p /var/lib/postgresql /var/run/postgresql /var/lib/redis /var/log/red
     && chown -R redis:redis /var/lib/redis /var/log/redis
 
 # Runtime bootstrap script.
-RUN cat > /usr/local/bin/openclaw-container-start <<'EOF'
+RUN mkdir -p /var/log/postgresql && chown postgres:postgres /var/log/postgresql
+RUN cat > /usr/local/bin/openclaw-container-start << 'EOF'
 #!/usr/bin/env bash
-set -Eeuo pipefail
+# Note: Do NOT use set -e here. PostgreSQL/Redis startup errors must be handled
+# per-function to prevent the container from aborting prematurely.
 
 export PATH="/root/.bun/bin:/usr/lib/postgresql/15/bin:${PATH}"
 export PGDATA="/var/lib/postgresql/15/main"
+export PG_LOG="/var/log/postgresql/postgresql.log"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-opencrm_local_dev}"
 export OPENCRM_DB="${OPENCRM_DB:-opencrm_db}"
 export REDIS_BIND="${REDIS_BIND:-127.0.0.1}"
 export REDIS_PORT="${REDIS_PORT:-6379}"
 
-mkdir -p /root/.openclaw/workspace /root/.openclaw/rclone /root/.config /var/run/postgresql /var/lib/redis /var/log/redis
+# Ensure all runtime dirs exist and have correct ownership
+mkdir -p /root/.openclaw/workspace /root/.openclaw/rclone /root/.config
+mkdir -p /var/run/postgresql /var/lib/postgresql /var/log/postgresql
+mkdir -p /var/lib/redis /var/log/redis
 ln -sfn /root/.openclaw/rclone /root/.config/rclone
-chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql
+chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql /var/log/postgresql
 chown -R redis:redis /var/lib/redis /var/log/redis
+touch "${PG_LOG}" && chown postgres:postgres "${PG_LOG}"
 
 init_postgres() {
   if [ ! -s "${PGDATA}/PG_VERSION" ]; then
     echo "🐘 Initializing PostgreSQL data directory: ${PGDATA}"
     mkdir -p "${PGDATA}"
     chown -R postgres:postgres "${PGDATA}"
-    su -s /bin/bash postgres -c "initdb -D '${PGDATA}' --encoding=UTF8 --locale=C.UTF-8"
+    if ! su -s /bin/bash postgres -c "initdb -D '${PGDATA}' --encoding=UTF8 --locale=C.UTF-8"; then
+      echo "❌ initdb failed! Check permissions on ${PGDATA}"
+      return 1
+    fi
     cat >> "${PGDATA}/postgresql.conf" <<PGCONF
 listen_addresses = '127.0.0.1'
 port = 5432
@@ -134,20 +144,36 @@ host all all 127.0.0.1/32 md5
 host all all ::1/128 md5
 PGHBA
     chown -R postgres:postgres "${PGDATA}"
+    echo "🐘 PostgreSQL data directory initialized."
+  else
+    echo "🐘 Existing data directory found at ${PGDATA}."
   fi
 }
 
 start_postgres() {
-  init_postgres
+  if ! init_postgres; then
+    echo "❌ Skipping PostgreSQL start due to init failure."
+    return 1
+  fi
+
   if pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
     echo "🐘 PostgreSQL already running."
   else
     echo "🐘 Starting PostgreSQL..."
-    su -s /bin/bash postgres -c "pg_ctl -D '${PGDATA}' -l /var/lib/postgresql/postgresql.log start"
+    # -w = wait until server is ready before returning (critical fix)
+    if ! su -s /bin/bash postgres -c "pg_ctl -D '${PGDATA}' -l '${PG_LOG}' -w -t 60 start"; then
+      echo "❌ PostgreSQL failed to start. Last log lines:"
+      tail -20 "${PG_LOG}" 2>/dev/null || echo "(no log found)"
+      return 1
+    fi
   fi
 
+  echo "🐘 Waiting for PostgreSQL to accept connections..."
   for i in $(seq 1 30); do
-    if pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then break; fi
+    if pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
+      echo "🐘 PostgreSQL is ready (attempt ${i}/30)."
+      break
+    fi
     sleep 1
   done
 
@@ -200,7 +226,18 @@ echo "   OpenCRM DB URL: postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:54
 echo "   Redis URL: redis://127.0.0.1:${REDIS_PORT}"
 echo "💡 First time? Run: openclaw onboard"
 
-tail -f /root/.openclaw/gateway.log /var/lib/postgresql/postgresql.log /var/log/redis/redis-server.log 2>/dev/null || tail -f /dev/null
+# Tail log files that exist; fall back to /dev/null to keep container alive
+TAIL_FILES=()
+[ -f "/root/.openclaw/gateway.log" ] && TAIL_FILES+=("/root/.openclaw/gateway.log")
+[ -f "${PG_LOG}" ] && TAIL_FILES+=("${PG_LOG}")
+[ -f "/var/log/redis/redis-server.log" ] && TAIL_FILES+=("/var/log/redis/redis-server.log")
+
+if [ ${#TAIL_FILES[@]} -gt 0 ]; then
+  tail -f "${TAIL_FILES[@]}" 2>/dev/null &
+fi
+
+# Keep container alive
+tail -f /dev/null
 EOF
 RUN chmod +x /usr/local/bin/openclaw-container-start
 
