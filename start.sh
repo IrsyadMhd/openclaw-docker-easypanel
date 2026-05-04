@@ -24,29 +24,23 @@ start_hermes() {
     fi
   fi
 
-  # Start Hermes gateway in background if not already running
-  if command -v ss >/dev/null 2>&1 && ss -tlnp 2>/dev/null | grep -qE ':(3000|8080)'; then
-    echo "⚠️  Hermes gateway already running, skipping..."
-  else
-    hermes gateway start >> "${HERMES_HOME}/gateway.log" 2>&1 &
-    echo $! > /run/hermes-gateway.pid
-    echo "⚕ Hermes gateway launched (PID: $!, logs: ${HERMES_HOME}/gateway.log)"
-  fi
+  echo ""
+  echo "💡 First time? Run:"
+  echo "   hermes setup        — Configure model & API keys"
+  echo "   hermes gateway setup — Configure messaging (Telegram, etc.)"
+  echo "   hermes doctor       — Diagnose any issues"
+  echo ""
+
+  echo "⚕ Starting Hermes gateway..."
+  # Jalankan di foreground agar log tampil di console (Docker logs).
+  # Jika gateway berhenti atau belum di-setup, script akan lanjut ke tail -f /dev/null.
+  hermes gateway
+  
+  echo "⚠️ Hermes gateway exited."
 }
 
 start_hermes
 
-echo "✅ Runtime ready."
-echo ""
-echo "💡 First time? Run:"
-echo "   hermes setup        — Configure model & API keys"
-echo "   hermes gateway setup — Configure messaging (Telegram, etc.)"
-echo "   hermes doctor       — Diagnose any issues"
-
-# Tail gateway log if it exists
-if [ -f "${HERMES_HOME}/gateway.log" ]; then
-  tail -f "${HERMES_HOME}/gateway.log" 2>/dev/null &
-fi
-
-# Keep container alive
+echo "✅ Container is running (kept alive for debugging or setup)."
+# Keep container alive if gateway exits (e.g. before first-time setup is complete)
 tail -f /dev/null

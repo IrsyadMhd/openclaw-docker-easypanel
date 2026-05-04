@@ -169,8 +169,7 @@ Semua data penting disimpan di volume `/root/.hermes/` agar survive rebuild:
 │   ├── MEMORY.md             ← Agent memory
 │   └── USER.md               ← User profile memory
 ├── skills/                   ← Skill documents
-├── sessions/                 ← Session database
-└── gateway.log               ← Log gateway
+└── sessions/                 ← Session database
 ```
 
 ---
@@ -191,7 +190,7 @@ Semua data penting disimpan di volume `/root/.hermes/` agar survive rebuild:
 | Container exit sendiri | Pastikan `restart: unless-stopped` aktif di EasyPanel |
 | Hermes gagal start | Jalankan `hermes doctor` untuk diagnostik |
 | Perlu update Hermes | Masuk terminal → `hermes update` |
-| Cek log gateway | `cat /root/.hermes/gateway.log` |
+| Cek log gateway | Lihat log container di UI EasyPanel atau jalankan `docker logs hermes-agent` |
 | Setup sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
 | Migrasi dari OpenClaw | `hermes claw migrate --dry-run` untuk preview, lalu `hermes claw migrate` |
 | Model/API key salah | `hermes model` untuk ganti model, edit `/root/.hermes/.env` untuk API keys |
