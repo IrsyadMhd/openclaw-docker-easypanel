@@ -1,26 +1,27 @@
 # =============================================================================
-# OpenClaw — Simple VPS-Style Container for EasyPanel (ARM64)
+# Hermes Agent — AI Agent Container for EasyPanel (ARM64)
 # =============================================================================
 # Usage:
-#   docker compose -f docker-compose.easypanel.yml up -d
-#   docker exec -it openclaw bash
-#   openclaw onboard
+#   docker compose up -d
+#   docker exec -it hermes-agent bash
+#   hermes setup
 # =============================================================================
 
 services:
-  openclaw:
+  hermes-agent:
     build:
       context: .
-      dockerfile: Dockerfile.arm64
-    image: openclaw:arm64
-    container_name: openclaw
+      dockerfile: Dockerfile
+    image: hermes-agent:arm64
+    container_name: hermes-agent
     volumes:
-      - openclaw-data:/root/.openclaw
+      - hermes-data:/root/.hermes
     ports:
-      - "18789:18789"
+      - "3000:3000"
+      - "8080:8080"
     init: true
     restart: unless-stopped
 
 volumes:
-  openclaw-data:
+  hermes-data:
     driver: local

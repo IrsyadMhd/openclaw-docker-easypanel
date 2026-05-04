@@ -1,9 +1,11 @@
-# 🦞 OpenClaw — Deploy ke EasyPanel (ARM64)
+# ⚕ Hermes Agent — Deploy ke EasyPanel (ARM64)
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw`, `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
-Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
+Container ini menjalankan **Hermes Agent** (AI agent by Nous Research) di ARM64.
+Setelah deploy, masuk ke terminal dan jalankan `hermes setup` untuk konfigurasi awal.
+
+> 💡 **Hermes Agent** adalah penerus OpenClaw dengan fitur yang jauh lebih kaya: self-improving skills, multi-platform messaging (Telegram, Discord, Slack, WhatsApp, Signal), browser automation, cron scheduling, subagent delegation, dan memory persisten lintas session.
 
 ---
 
@@ -14,93 +16,63 @@ Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup aw
 1. Buka EasyPanel → **Create Service** → **App** → **GitHub**
 2. Arahkan ke repo ini
 3. **Dockerfile Path**: `Dockerfile`
-4. **Volume**: mount `/root/.openclaw` → agar data persistent (tidak hilang saat restart/rebuild)
-5. **Port**: ⚠️ **Tidak wajib** — hanya perlu jika ingin akses Control UI via web
-   - Jika butuh: Published `18789`, Target `18789`, Protocol `TCP`
-   - Jika tidak butuh akses web: **skip, jangan buat port**
+4. **Volume**: mount `/root/.hermes` → agar data persistent (tidak hilang saat restart/rebuild)
+5. **Port**:
+   - `3000` → Hermes web dashboard
+   - `8080` → Hermes gateway
 6. Klik **Deploy**, tunggu build selesai
 
-### Langkah 2 — Onboarding (Pertama Kali Saja)
+### Langkah 2 — Setup (Pertama Kali Saja)
 
 1. Buka tab **Terminal** di EasyPanel
 2. Jalankan:
    ```bash
-   openclaw onboard
+   hermes setup
    ```
-3. Ikuti instruksi onboarding (setup Telegram bot, dll)
-4. Sampai muncul pesan:
-   ```
-   Onboarding complete. Use the dashboard link above to control OpenClaw.
+3. Ikuti instruksi setup:
+   - Pilih LLM provider (OpenRouter, Nous Portal, OpenAI, Anthropic, dll)
+   - Masukkan API key
+   - Konfigurasi messaging platform (Telegram, Discord, dll)
+4. Setelah selesai, setup gateway:
+   ```bash
+   hermes gateway setup
    ```
 
 ### Langkah 3 — Restart Container
 
-> ⚠️ **PENTING**: Setelah onboarding selesai, **WAJIB restart container** agar gateway otomatis jalan.
+> ⚠️ **PENTING**: Setelah setup selesai, **WAJIB restart container** agar gateway otomatis jalan.
 
-1. Di EasyPanel → klik **Redeploy** atau **Restart** pada service OpenClaw
+1. Di EasyPanel → klik **Redeploy** atau **Restart** pada service
 2. Setelah restart, gateway akan **otomatis berjalan** di background
 3. Coba chat ke bot Telegram — seharusnya sudah merespons ✅
 
-### Langkah 4 — Setup Rclone (Opsional)
+### Langkah 4 — Migrasi dari OpenClaw (Jika Applicable)
 
-Rclone sudah terinstall dan config file kosong sudah tersedia.
-Config disimpan di volume persistent (`/root/.openclaw/rclone/`), jadi **tidak hilang** saat rebuild.
+Jika sebelumnya menggunakan OpenClaw, Hermes bisa otomatis import data lama:
 
-1. Buka Terminal di EasyPanel
-2. Edit config:
-   ```bash
-   vim /root/.config/rclone/rclone.conf
-   ```
-3. Isi konfigurasi rclone, contoh:
-   ```ini
-   [gdrive]
-   type = drive
-   team_drive =
-   token = {"access_token":"ya29.a0AT......."}
-   ```
-4. Simpan (`:wq`), lalu verifikasi:
-   ```bash
-   rclone lsd gdrive:
-   ```
+```bash
+# Preview apa yang akan di-migrate
+hermes claw migrate --dry-run
 
-### Langkah 5 — Setup Gog CLI (Opsional)
+# Jalankan migrasi (import persona, memories, skills, API keys)
+hermes claw migrate
+```
 
-[`gog`](https://github.com/steipete/gogcli) adalah CLI untuk Google Suite — Gmail, Calendar, Drive, Contacts, Sheets, Docs, dan lainnya. Sudah terinstall di container.
-
-1. **Buat OAuth2 Credentials** di [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
-   - Buat project → Enable API yang dibutuhkan (Gmail, Drive, Calendar, dll)
-   - Buat OAuth client (Desktop app) → Download JSON file
-
-2. **Upload credentials** ke container (via rclone, scp, atau paste manual):
-   ```bash
-   # Simpan credentials
-   gog auth credentials /path/to/client_secret_xxx.json
-   ```
-
-3. **Tambah akun Google** (headless/remote flow untuk server tanpa browser):
-   ```bash
-   # Manual flow — cocok untuk server tanpa browser
-   gog auth add you@gmail.com --services user --manual
-   # CLI akan print URL → buka di browser lokal → paste redirect URL kembali
-   ```
-
-4. **Test**:
-   ```bash
-   export GOG_ACCOUNT=you@gmail.com
-   gog gmail labels list
-   ```
-
-> 💡 **Tips**: Gunakan `--manual` atau `--remote` flag saat `auth add`, karena container tidak punya browser.
+Yang akan di-import:
+- **SOUL.md** — persona file
+- **Memories** — MEMORY.md dan USER.md
+- **Skills** — user-created skills
+- **API keys** — Telegram, OpenRouter, OpenAI, Anthropic, dll
+- **Messaging settings** — platform configs, allowed users
 
 ### Setelah Restart — Verifikasi
 
-Buka Terminal di EasyPanel, cek gateway berjalan:
+Buka Terminal di EasyPanel, cek Hermes berjalan:
 
 ```bash
-ps aux | grep openclaw
+hermes doctor
+hermes gateway status
 ```
-
-Jika ada proses `openclaw-gateway`, berarti sudah jalan. ✅
 
 ---
 
@@ -109,19 +81,17 @@ Jika ada proses `openclaw-gateway`, berarti sudah jalan. ✅
 ```
 Deploy Container
     ↓
-Container Start → Gateway GAGAL (belum onboarding) → Container tetap hidup
+Container Start → Hermes gateway start
     ↓
-Buka Terminal → openclaw onboard
+Buka Terminal → hermes setup
     ↓
-Onboarding Selesai
+Setup Selesai
     ↓
 ⚠️ RESTART Container di EasyPanel
     ↓
 Container Start → Gateway BERHASIL (config sudah ada) ✅
     ↓
-Bot Telegram aktif, siap digunakan 🎉
-    ↓
-(Opsional) Setup rclone, gog, dll via terminal
+Bot Telegram/Discord aktif, siap digunakan 🎉
 ```
 
 ---
@@ -133,16 +103,16 @@ Bot Telegram aktif, siap digunakan 🎉
 docker compose up -d
 
 # 2. Masuk ke terminal container
-docker exec -it openclaw bash
+docker exec -it hermes-agent bash
 
-# 3. Jalankan onboarding
-openclaw onboard
+# 3. Jalankan setup
+hermes setup
 
-# 4. Restart container setelah onboarding
-docker restart openclaw
+# 4. Setup gateway
+hermes gateway setup
 
-# 5. (Opsional) Setup rclone
-vim /root/.config/rclone/rclone.conf
+# 5. Restart container setelah setup
+docker restart hermes-agent
 ```
 
 ---
@@ -151,64 +121,65 @@ vim /root/.config/rclone/rclone.conf
 
 | Tool | Kegunaan |
 |------|----------|
-| `openclaw` | AI assistant via Telegram |
-| `gog` | [Google Suite CLI](https://github.com/steipete/gogcli) — Gmail, Calendar, Drive, Contacts, Sheets, Docs, dll |
-| `gemini` | Google Gemini CLI — AI coding assistant |
-| `vim` | Text editor |
-| `rclone` | Sync/transfer file ke cloud storage (GDrive, S3, dll) |
-| `nano` | Text editor alternatif |
+| `hermes` | AI agent — Telegram, Discord, Slack, WhatsApp, Signal, CLI |
+| `vim` / `nano` | Text editor |
 | `git` | Version control |
 | `htop` | Monitor proses |
 | `curl` | HTTP request |
+| `rg` | ripgrep — fast file search |
+| `ffmpeg` | Media processing (TTS voice messages) |
 
 ---
 
 ## Perintah Berguna
 
 ```bash
-# OpenClaw
-openclaw onboard                          # Setup awal (pertama kali)
-openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
-openclaw doctor                           # Diagnostik
-openclaw update                           # Update ke versi terbaru
+# Hermes Agent
+hermes                                    # Interactive CLI chat
+hermes setup                              # Setup wizard (pertama kali)
+hermes model                              # Ganti LLM model/provider
+hermes gateway setup                      # Setup messaging platform
+hermes gateway start                      # Jalankan gateway
+hermes gateway status                     # Cek status gateway
+hermes tools                              # Konfigurasi tools
+hermes doctor                             # Diagnostik
+hermes update                             # Update ke versi terbaru
+hermes claw migrate                       # Migrasi dari OpenClaw
 
-# Rclone
-rclone lsd gdrive:                        # Test koneksi rclone
-rclone copy gdrive:folder /local/path     # Copy file dari cloud
-
-# Gog (Google Suite CLI)
-gog --version                             # Cek versi
-gog auth list                             # List akun yang tersimpan
-gog gmail labels list                     # List label Gmail
-gog gmail search "is:unread"              # Cari email
-gog gmail send --to a@b.com --subject Hi  # Kirim email
-gog calendar events                       # List event kalender
-gog drive ls                              # List file di Google Drive
-gog drive upload file.pdf                 # Upload file ke Drive
-gog contacts search "John"                # Cari kontak
-gog sheets read SPREADSHEET_ID            # Baca spreadsheet
+# Hermes Slash Commands (dalam chat)
+/new                                      # Conversation baru
+/model openrouter:anthropic/claude-opus-4 # Ganti model
+/skills                                   # List skills
+/cron                                     # Buat scheduled task
+/compress                                 # Kompres conversation
 ```
 
 ---
 
 ## Struktur Persistent Data
 
-Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
+Semua data penting disimpan di volume `/root/.hermes/` agar survive rebuild:
 
 ```
-/root/.openclaw/
-├── rclone/
-│   └── rclone.conf          ← Config rclone (symlink ke /root/.config/rclone/)
-├── workspace/                ← Working directory openclaw
-├── gateway.log               ← Log gateway
-└── ... (config openclaw lainnya)
+/root/.hermes/
+├── config.yaml               ← Hermes settings (model, tools, display)
+├── .env                      ← API keys (OpenRouter, Telegram, dll)
+├── auth.json                 ← OAuth tokens
+├── memories/
+│   ├── MEMORY.md             ← Agent memory
+│   └── USER.md               ← User profile memory
+├── skills/                   ← Skill documents
+├── sessions/                 ← Session database
+└── gateway.log               ← Log gateway
 ```
 
-> 💡 **Gog config** disimpan di `~/.config/gog/`. Jika ingin persist, symlink ke volume:
-> ```bash
-> mkdir -p /root/.openclaw/gog
-> ln -s /root/.openclaw/gog /root/.config/gog
-> ```
+---
+
+## Environment Variables
+
+| Variable | Default | Deskripsi |
+|----------|---------|-----------|
+| `HERMES_HOME` | `/root/.hermes` | Data directory Hermes |
 
 ---
 
@@ -216,11 +187,11 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 
 | Masalah | Solusi |
 |---------|--------|
-| Bot Telegram tidak merespons | Pastikan gateway jalan: `ps aux \| grep openclaw`. Jika tidak ada, restart container atau jalankan `openclaw gateway &` |
-| Container exit sendiri | Pastikan `restart: unless-stopped` aktif |
-| Port tidak bisa diakses | Pastikan gateway bind ke `lan`: `openclaw gateway --port 18789 --bind lan &` |
-| Perlu update openclaw | Masuk terminal → `npm install -g openclaw@latest` |
-| Cek log gateway | `cat /root/.openclaw/gateway.log` |
-| Onboarding sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
-| Rclone config hilang setelah rebuild | Seharusnya tidak, karena disimpan di volume. Cek volume mount di EasyPanel |
-| Rclone error "config not found" | Cek symlink: `ls -la /root/.config/rclone/` |
+| Bot Telegram tidak merespons | Cek gateway: `hermes gateway status`. Jika mati, restart container atau `hermes gateway start` |
+| Container exit sendiri | Pastikan `restart: unless-stopped` aktif di EasyPanel |
+| Hermes gagal start | Jalankan `hermes doctor` untuk diagnostik |
+| Perlu update Hermes | Masuk terminal → `hermes update` |
+| Cek log gateway | `cat /root/.hermes/gateway.log` |
+| Setup sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
+| Migrasi dari OpenClaw | `hermes claw migrate --dry-run` untuk preview, lalu `hermes claw migrate` |
+| Model/API key salah | `hermes model` untuk ganti model, edit `/root/.hermes/.env` untuk API keys |
