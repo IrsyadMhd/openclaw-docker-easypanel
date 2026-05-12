@@ -9,7 +9,7 @@
 # Exec:   docker exec -it openclaw bash
 # =============================================================================
 
-FROM --platform=linux/arm64 node:22-bookworm
+FROM --platform=linux/arm64 node:24-bookworm
 
 # Install essential tools (like a real VPS)
 RUN apt-get update && \
@@ -39,7 +39,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 #   Contoh: 1GB RAM container → 600, 2GB → 1200, 4GB → 2400
 ENV NODE_OPTIONS=--max-old-space-size=1200
 
-# Matikan auto-update background di v4.26+ agar tidak ada CPU spike tersembunyi
+# Matikan auto-update background agar tidak ada CPU spike tersembunyi
 # saat startup maupun saat chat. Upgrade manual via: npm install -g openclaw@latest
 ENV OPENCLAW_NO_AUTO_UPDATE=1
 
@@ -52,13 +52,16 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-# v4.26 changelog penting:
-#   - Fix gateway self-respawn loop di Linux low-memory (#72720)
-#   - Fix SQLite WAL growth tak terbatas (#72774)
-#   - Fix QMD embedding probe di ARM64 (#59234)
-#   - Fix tool-loop heartbeat inherit stale state (#40144)
-#   - Fix Control UI stall saat chat (#72365)
-RUN npm install -g openclaw@2026.4.26
+# 2026.5.7 changelog penting (28 fixes):
+#   - Security: native command handlers enforce owner restrictions
+#   - Security: global memory toggles require admin scope
+#   - Plugin publishing: retry untuk transient ClawHub CLI failures
+#   - Plugin publishing: post-publish version verification
+#   - Discord voice: silence grace 2.5s, + config knob voice.captureSilenceGraceMs
+#   - Cron CLI: --json output kini include computed status field
+#   - Session: cached skill snapshots cleared saat /new & sessions.reset
+#   - OpenAI: support openai/chat-latest sebagai direct API-key model override
+RUN npm install -g openclaw@2026.5.7
 
 # Install Python packages (baked into image, persists across restarts)
 RUN pip3 install --break-system-packages mysql-connector-python
@@ -83,9 +86,9 @@ EXPOSE 18789
 # Guard: skip if port 18789 already bound (gateway already running)
 # Container stays alive either way — run "openclaw onboard" if first time
 #
-# Catatan v4.26: gateway dijalankan sebagai background process (&) — ini adalah
+# Gateway dijalankan sebagai background process (&) — ini adalah
 # "foreground gateway run" dari sudut pandang openclaw, sehingga self-respawn
-# loop tidak terjadi (fix #72720 sudah menangani ini untuk Linux host).
+# loop tidak terjadi.
 CMD ["bash", "-c", "\
   echo '🦞 OpenClaw container started.'; \
   echo \"   NODE_OPTIONS : $NODE_OPTIONS\"; \

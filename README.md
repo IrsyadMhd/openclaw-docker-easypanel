@@ -2,7 +2,7 @@
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw` (v4.26), `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
+Container ini bekerja seperti **VPS** — sudah terinstall `openclaw` (v5.7), `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
 Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
 
 ---
