@@ -89,6 +89,9 @@ EXPOSE 18789
 # Gateway dijalankan sebagai background process (&) — ini adalah
 # "foreground gateway run" dari sudut pandang openclaw, sehingga self-respawn
 # loop tidak terjadi.
+#
+# Plugin gc-provider di-install otomatis jika belum ada (idempotent).
+# Data plugin tersimpan di /root/.openclaw (persistent volume).
 CMD ["bash", "-c", "\
   echo '🦞 OpenClaw container started.'; \
   echo \"   NODE_OPTIONS : $NODE_OPTIONS\"; \
@@ -99,6 +102,14 @@ CMD ["bash", "-c", "\
     openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
     echo $! > /run/openclaw-gateway.pid; \
     echo '🦞 Gateway launched (PID: '\"$!\"', logs: /root/.openclaw/gateway.log)'; \
+  fi; \
+  if openclaw plugins list 2>/dev/null | grep -q 'gc-provider'; then \
+    echo '✅ Plugin gc-provider already installed.'; \
+  else \
+    echo '📦 Installing plugin gc-provider...'; \
+    openclaw plugins install clawhub:gc-provider 2>&1 && \
+      echo '✅ Plugin gc-provider installed successfully.' || \
+      echo '⚠️  Plugin gc-provider install failed (run manually after onboard).'; \
   fi; \
   echo '💡 First time? Run: openclaw onboard'; \
   echo '🔧 Performance tip: openclaw doctor --fix (jalankan setelah onboard)'; \
