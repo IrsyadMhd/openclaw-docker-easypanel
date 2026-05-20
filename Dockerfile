@@ -52,16 +52,16 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-# 2026.5.7 changelog penting (28 fixes):
-#   - Security: native command handlers enforce owner restrictions
-#   - Security: global memory toggles require admin scope
-#   - Plugin publishing: retry untuk transient ClawHub CLI failures
-#   - Plugin publishing: post-publish version verification
-#   - Discord voice: silence grace 2.5s, + config knob voice.captureSilenceGraceMs
-#   - Cron CLI: --json output kini include computed status field
-#   - Session: cached skill snapshots cleared saat /new & sessions.reset
-#   - OpenAI: support openai/chat-latest sebagai direct API-key model override
-RUN npm install -g openclaw@2026.5.7
+# 2026.5.12 changelog penting:
+#   - Leaner installs: WhatsApp, Slack, Bedrock, Vertex di-eksternalisasi dari core
+#   - Memory leak fix: transcript streaming helpers (RSS growth 10x lebih hemat)
+#   - Gateway protocol v4: explicit deltaText/replace frames
+#   - Telegram: isolated polling, durable spooling, better group-media handling
+#   - Security: per-sender tool permissions, approval wajib untuk device pairing
+#   - Codex: OpenAI agent turns on native Codex harness
+#   - Plugin management: peer-dependency preservation, pnpm 11 support
+#   - Cron & UI: inspect cron by ID, recovery panel for blank dashboards
+RUN npm install -g openclaw@2026.5.12
 
 # Install Python packages (baked into image, persists across restarts)
 RUN pip3 install --break-system-packages mysql-connector-python
