@@ -1,5 +1,5 @@
 # =============================================================================
-# Hermes Agent — AI Agent Container for EasyPanel (ARM64)
+# Hermes Agent v0.13.0 — AI Agent Container for EasyPanel (ARM64)
 # =============================================================================
 # Usage:
 #   docker compose up -d
@@ -15,10 +15,10 @@ services:
     image: hermes-agent:arm64
     container_name: hermes-agent
     volumes:
-      - hermes-data:/root/.hermes
+      - hermes-data:/opt/data
     ports:
       - "3000:3000"
-      - "8080:8080"
+      - "8642:8642"
     init: true
     restart: unless-stopped
 

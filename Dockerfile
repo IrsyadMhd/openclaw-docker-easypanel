@@ -1,5 +1,5 @@
 # =============================================================================
-# Hermes Agent — ARM64 container for EasyPanel
+# Hermes Agent v0.13.0 — ARM64 container for EasyPanel
 # =============================================================================
 # Purpose:
 # - Hermes Agent runtime (AI agent by Nous Research)
@@ -9,8 +9,12 @@
 #
 # Important durability note:
 # - For EasyPanel/container recreate/redeploy, bind or named volumes MUST be kept/mounted:
-#     /root/.hermes
+#     /opt/data
 # - Do not delete the volume when redeploying, or Hermes data can be lost.
+#
+# Security note (v0.13.0):
+# - Gateway runs as non-root `hermes` user (UID 10000) by default.
+# - Set HERMES_ALLOW_ROOT_GATEWAY=1 to override (not recommended).
 # =============================================================================
 
 FROM --platform=linux/arm64 node:22-bookworm
@@ -18,7 +22,7 @@ FROM --platform=linux/arm64 node:22-bookworm
 ENV TZ=Asia/Jakarta \
     DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/hermes/.venv/bin:$PATH \
-    HERMES_HOME=/root/.hermes \
+    HERMES_HOME=/opt/data \
     PYTHONUNBUFFERED=1
 
 # Essential tools + Hermes dependencies.
@@ -68,17 +72,24 @@ RUN git clone --depth=1 -b "${HERMES_BRANCH}" \
 # Symlink hermes command to PATH for easy access.
 RUN ln -sf /opt/hermes/hermes /usr/local/bin/hermes
 
-# Create Hermes data directory.
-RUN mkdir -p /root/.hermes
+# Create non-root hermes user (UID 10000) and data directory.
+# v0.13.0 refuses to run gateway as root for security reasons.
+RUN groupadd -g 10000 hermes && \
+    useradd -u 10000 -g hermes -m -s /bin/bash hermes && \
+    mkdir -p /opt/data && \
+    chown -R hermes:hermes /opt/data /opt/hermes
 
 # Runtime bootstrap script.
 COPY start.sh /usr/local/bin/hermes-container-start
 RUN chmod +x /usr/local/bin/hermes-container-start
 
 # Persistent data. Keep this mounted in EasyPanel.
-VOLUME ["/root/.hermes"]
+VOLUME ["/opt/data"]
 
-EXPOSE 3000 8080
+EXPOSE 3000 8642
+
+# Switch to non-root user.
+USER hermes
 
 ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
 CMD ["/usr/local/bin/hermes-container-start"]

@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Hermes Agent container bootstrap script.
+# Hermes Agent container bootstrap script (v0.13.0+).
 # Do NOT use set -e — startup errors are handled per-function.
 
 export PATH="/opt/hermes/.venv/bin:${PATH}"
-export HERMES_HOME="${HERMES_HOME:-/root/.hermes}"
+export HERMES_HOME="${HERMES_HOME:-/opt/data}"
 
 # Ensure runtime dirs exist
 mkdir -p "${HERMES_HOME}"
 
 start_hermes() {
-  echo "⚕ Hermes Agent container started."
+  echo "⚕ Hermes Agent container started (v0.13.0)."
 
   # Check for legacy OpenClaw data and suggest migration
-  if [ -d "/root/.openclaw" ] && [ -f "/root/.openclaw/workspace/.soul" ]; then
+  if [ -d "${HERMES_HOME}/../.openclaw" ] && [ -f "${HERMES_HOME}/../.openclaw/workspace/.soul" ]; then
     if [ ! -f "${HERMES_HOME}/.migrated-from-openclaw" ]; then
       echo ""
       echo "╔═══════════════════════════════════════════════════════════╗"
-      echo "║  💡 OpenClaw data detected at /root/.openclaw            ║"
+      echo "║  💡 OpenClaw data detected                               ║"
       echo "║  Run: hermes claw migrate                                ║"
       echo "║  This imports persona, memories, skills & API keys.      ║"
       echo "╚═══════════════════════════════════════════════════════════╝"
@@ -31,10 +31,10 @@ start_hermes() {
   echo "   hermes doctor       — Diagnose any issues"
   echo ""
 
-  echo "⚕ Starting Hermes gateway..."
-  # Jalankan di foreground agar log tampil di console (Docker logs).
-  # Jika gateway berhenti atau belum di-setup, script akan lanjut ke tail -f /dev/null.
-  hermes gateway
+  echo "⚕ Starting Hermes gateway (foreground)..."
+  # v0.13.0: Use 'gateway run' for foreground execution (required for Docker).
+  # 'hermes gateway' alone no longer starts the process in foreground.
+  hermes gateway run
   
   echo "⚠️ Hermes gateway exited."
 }
