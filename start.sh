@@ -2,8 +2,15 @@
 # Hermes Agent container bootstrap script (v0.13.0+).
 # Do NOT use set -e — startup errors are handled per-function.
 
-export PATH="/opt/hermes/.venv/bin:${PATH}"
+# Activate the venv properly — sets VIRTUAL_ENV, prepends .venv/bin to PATH,
+# and ensures `python3` / `hermes` resolve to the venv interpreter, not system.
+export VIRTUAL_ENV="/opt/hermes/.venv"
+export PATH="${VIRTUAL_ENV}/bin:${PATH}"
 export HERMES_HOME="${HERMES_HOME:-/opt/data}"
+
+# Source activate for any tools that check for an "activated" venv.
+# shellcheck disable=SC1091
+[ -f "${VIRTUAL_ENV}/bin/activate" ] && . "${VIRTUAL_ENV}/bin/activate"
 
 # Ensure runtime dirs exist
 mkdir -p "${HERMES_HOME}"
