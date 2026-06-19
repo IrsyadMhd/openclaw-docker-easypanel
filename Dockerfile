@@ -62,7 +62,10 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
 RUN npm install -g openclaw@2026.5.20
 
 # Install Python packages (baked into image, persists across restarts)
-RUN pip3 install --break-system-packages mysql-connector-python
+RUN pip3 install --break-system-packages \
+      mysql-connector-python \
+      google-api-python-client==2.197.0 \
+      google-auth==2.55.0
 
 # Install gogcli (gog) — Google Suite CLI (Gmail, GCal, GDrive, Contacts, etc.)
 # https://github.com/steipete/gogcli
