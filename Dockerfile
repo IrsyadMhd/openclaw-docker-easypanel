@@ -52,14 +52,9 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-# 2026.5.20 changelog penting:
-#   - Discord Voice: follow user antar channel, multi-user handoff, DAVE recovery
-#   - Security: legacy skill-loading path dihapus, credential symlink fail-closed
-#   - Doctor: security checkup — deteksi plaintext API keys di openclaw.json
-#   - Platform: fix Windows setup hang, xAI device-code OAuth untuk headless/VPS
-#   - Dependencies: @openclaw/fs-safe 0.2.7, bundled Codex @openai/codex 0.132.0
+# 2026.6.34
 #   - Node.js: minimum Node 22.19 (Node 24 tetap recommended)
-RUN npm install -g openclaw@2026.5.20
+RUN npm install -g openclaw@2026.6.34
 
 # Install Python packages (baked into image, persists across restarts)
 RUN pip3 install --break-system-packages \
