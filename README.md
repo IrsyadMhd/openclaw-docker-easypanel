@@ -2,7 +2,8 @@
 
 ## Konsep
 
-Container ini bekerja seperti **VPS** — sudah terinstall `openclaw` (v2026.6.34), `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
+Container ini bekerja seperti **VPS** — sudah terinstall `openclaw` (v2026.9.3), `gog` (Google Suite CLI), `vim`, dan `rclone` secara global.
+Runtime container menggunakan **Node.js 26** (direkomendasikan untuk OpenClaw 2026.9.3, dengan syarat minimum Node 24.16.0+).
 Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup awal.
 
 ---
@@ -175,7 +176,7 @@ openclaw onboard                          # Setup awal (pertama kali)
 openclaw doctor --fix                     # Bersihkan config lama (wajib setelah upgrade)
 openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
 openclaw doctor                           # Diagnostik
-npm install -g openclaw@2026.6.34         # Update ke versi spesifik (cara aman)
+npm install -g openclaw@2026.9.3         # Update ke versi spesifik (cara aman)
 npm install -g openclaw@latest            # Update ke versi terbaru
 
 # Monitor resource container
@@ -232,7 +233,8 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 | **CPU spike 100% saat chat** | Pastikan `OPENCLAW_NO_AUTO_UPDATE=1` ter-set. Cek log: `cat /root/.openclaw/gateway.log`. Jalankan `openclaw doctor --fix` |
 | **RAM bengkak >1.5GB** | Verifikasi `NODE_OPTIONS=--max-old-space-size=1200` aktif: `echo $NODE_OPTIONS`. Nilai ideal ~60% dari RAM container |
 | Config error setelah upgrade versi | Jalankan `openclaw doctor --fix` untuk auto-repair config yang tidak kompatibel |
-| Perlu update openclaw | Masuk terminal → `npm install -g openclaw@2026.6.34` (atau `@latest`) |
+| Perlu update openclaw | Masuk terminal → `npm install -g openclaw@2026.9.3` (atau `@latest`) |
+| Runtime Node.js tidak kompatibel | OpenClaw 2026.9.3 butuh Node 24.16.0+ atau 26.1.0+ (Node 26 recommended). Node 22/23/25 tidak didukung. |
 | Cek log gateway | `cat /root/.openclaw/gateway.log` atau `tail -f /root/.openclaw/gateway.log` |
 | Onboarding sudah selesai tapi gateway tidak jalan | **Restart container** di EasyPanel |
 | Rclone config hilang setelah rebuild | Seharusnya tidak, karena disimpan di volume. Cek volume mount di EasyPanel |

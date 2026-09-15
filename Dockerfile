@@ -9,7 +9,7 @@
 # Exec:   docker exec -it openclaw bash
 # =============================================================================
 
-FROM --platform=linux/arm64 node:24-bookworm
+FROM --platform=linux/arm64 node:26-bookworm
 
 # Install essential tools (like a real VPS)
 RUN apt-get update && \
@@ -52,9 +52,12 @@ RUN mkdir -p /root/.openclaw/rclone /root/.config \
     && touch /root/.openclaw/rclone/rclone.conf
 
 # Install OpenClaw globally
-# 2026.6.34
-#   - Node.js: minimum Node 22.19 (Node 24 tetap recommended)
-RUN npm install -g openclaw@2026.6.34
+# 2026.9.3
+#   - Node.js: minimum Node 24.16.0+ atau 26.1.0+ (Node 26 recommended)
+#   - Rehearsal update: kandidat update diuji di isolated candidate state sebelum aktivasi
+#   - SQLite text fix: mencegah truncation data teks panjang
+#   - Plugin SDK: compat surface lama dihapus, beralih ke subpath imports
+RUN npm install -g openclaw@2026.9.3
 
 # Install Python packages (baked into image, persists across restarts)
 RUN pip3 install --break-system-packages \
