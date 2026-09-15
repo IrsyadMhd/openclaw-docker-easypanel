@@ -179,6 +179,11 @@ openclaw doctor                           # Diagnostik
 npm install -g openclaw@2026.9.3         # Update ke versi spesifik (cara aman)
 npm install -g openclaw@latest            # Update ke versi terbaru
 
+# Plugin Management (GrowthCircle, dll)
+openclaw plugins list                     # Cek daftar & versi plugin terpasang
+openclaw plugins update gc-provider       # Update plugin GrowthCircle ke versi terbaru (v0.1.33+)
+openclaw plugins update --all             # Update seluruh plugin terpasang
+
 # Monitor resource container
 docker stats openclaw                     # Pantau CPU & RAM real-time
 cat /root/.openclaw/gateway.log           # Cek log gateway
