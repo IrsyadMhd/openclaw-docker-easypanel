@@ -23,20 +23,32 @@ Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup aw
 
 ### Langkah 2 — Onboarding (Pertama Kali Saja)
 
+> 💡 Pada start pertama, gateway yang dijalankan otomatis oleh container **akan gagal** dengan pesan `Missing config` di `gateway.log`. Ini normal karena onboarding belum dilakukan. Container tetap hidup.
+
 1. Buka tab **Terminal** di EasyPanel
-2. Jalankan:
+2. **Pastikan plugin GrowthCircle (`gc-provider`) sudah terpasang** — jika belum, pilihan provider GrowthCircle tidak akan muncul di wizard:
+   ```bash
+   openclaw plugins list
+   # Jika gc-provider tidak ada di daftar:
+   openclaw plugins install clawhub:gc-provider --accept-capabilities
+   openclaw plugins list                     # verifikasi ulang
+   openclaw plugins update gc-provider       # pastikan versi terbaru (v0.1.33+)
+   ```
+   > Install otomatis oleh container berjalan di background dan bisa gagal diam-diam saat start pertama, jadi selalu cek manual sebelum onboarding.
+3. Jalankan:
    ```bash
    openclaw onboard
    ```
-3. Ikuti instruksi onboarding (setup Telegram bot, dll)
-4. Sampai muncul pesan:
+4. Ikuti instruksi onboarding (pilih provider AI, setup Telegram bot, dll)
+5. Sampai muncul pesan:
    ```
    Onboarding complete. Use the dashboard link above to control OpenClaw.
    ```
-5. Jalankan perintah berikut untuk bersihkan config yang tidak kompatibel:
+6. Jalankan perintah berikut untuk bersihkan config yang tidak kompatibel:
    ```bash
    openclaw doctor --fix
    ```
+7. **Tutup sesi onboard/TUI** (Ctrl+C / `exit`) sebelum lanjut. Proses `openclaw-onboard` atau `openclaw-tui` yang masih menggantung bisa menahan lock gateway.
 
 ### Langkah 3 — Restart Container
 
@@ -44,7 +56,32 @@ Setelah deploy, masuk ke terminal dan jalankan `openclaw onboard` untuk setup aw
 
 1. Di EasyPanel → klik **Redeploy** atau **Restart** pada service OpenClaw
 2. Setelah restart, gateway akan **otomatis berjalan** di background
-3. Coba chat ke bot Telegram — seharusnya sudah merespons ✅
+
+> ⚠️ **Container ini tidak memakai systemd.** Jangan gunakan `openclaw gateway restart`, `openclaw gateway stop`, atau `openclaw daemon install` — perintah itu butuh service manager. Untuk restart tanpa me-redeploy container:
+> ```bash
+> pkill -f openclaw
+> sleep 2
+> ps aux | grep -i openclaw | grep -v grep     # harus kosong
+> nohup openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 &
+> sleep 8
+> tail -n 30 /root/.openclaw/gateway.log       # cari baris "[gateway] ready"
+> ```
+> `pkill` juga menutup sesi OpenClaw lain yang sedang terbuka (TUI, onboard).
+
+### Langkah 3b — Aktifkan & Pairing Telegram
+
+1. Cek status channel:
+   ```bash
+   openclaw channels status
+   ```
+   Status awal bisa `running, disconnected` — tunggu hingga ±2 menit (grace period koneksi channel) sampai `connected`.
+2. Kirim pesan apa saja ke bot Telegram Anda. Jika bot membalas dengan **kode pairing**, setujui di terminal:
+   ```bash
+   openclaw pairing list telegram
+   openclaw pairing approve telegram <KODE>
+   ```
+3. Coba chat lagi ke bot — seharusnya sudah merespons ✅
+4. Jika tetap `disconnected`, cek log: `grep -i telegram /tmp/openclaw/openclaw-$(date +%F).log | tail -n 40` (biasanya token salah atau container tidak bisa mencapai `api.telegram.org`).
 
 ### Langkah 4 — Setup Rclone (Opsional)
 
@@ -102,10 +139,12 @@ Config disimpan di volume persistent (`/root/.openclaw/rclone/`), jadi **tidak h
 Buka Terminal di EasyPanel, cek gateway berjalan:
 
 ```bash
-ps aux | grep openclaw
+ss -tlnp | grep 18789          # gateway listen di port 18789
+openclaw channels status       # Telegram: enabled, configured, running, connected
+openclaw plugins list          # gc-provider terpasang & enabled
 ```
 
-Jika ada proses `openclaw-gateway`, berarti sudah jalan. ✅
+Jika port 18789 listen dan Telegram `connected`, berarti sudah jalan. ✅
 
 ---
 
@@ -114,15 +153,17 @@ Jika ada proses `openclaw-gateway`, berarti sudah jalan. ✅
 ```
 Deploy Container
     ↓
-Container Start → Gateway GAGAL (belum onboarding) → Container tetap hidup
+Container Start → Gateway GAGAL "Missing config" (belum onboarding, normal) → Container tetap hidup
     ↓
-Buka Terminal → openclaw onboard
+Buka Terminal → openclaw plugins list (pastikan gc-provider ada, jika tidak: plugins install)
     ↓
-Onboarding Selesai
+openclaw onboard → openclaw doctor --fix → tutup sesi onboard/TUI
     ↓
 ⚠️ RESTART Container di EasyPanel
     ↓
 Container Start → Gateway BERHASIL (config sudah ada) ✅
+    ↓
+openclaw channels status → Telegram connected → pairing approve (jika diminta)
     ↓
 Bot Telegram aktif, siap digunakan 🎉
     ↓
@@ -140,15 +181,21 @@ docker compose up -d
 # 2. Masuk ke terminal container
 docker exec -it openclaw bash
 
-# 3. Jalankan onboarding
+# 3. Pastikan plugin gc-provider terpasang (install manual jika belum)
+openclaw plugins list
+openclaw plugins install clawhub:gc-provider --accept-capabilities
+
+# 4. Jalankan onboarding
 openclaw onboard
 
-# 4. Restart container setelah onboarding
+# 5. Restart container setelah onboarding
 docker restart openclaw
 
-# 5. (Opsional) Setup rclone
+# 6. (Opsional) Setup rclone
 vim /root/.config/rclone/rclone.conf
 ```
+
+> ⚠️ `docker-compose.yml` saat ini merujuk `Dockerfile.arm64` yang tidak ada di repo (yang tersedia hanya `Dockerfile`). Sesuaikan path `dockerfile:` sebelum memakai Docker Compose. Untuk EasyPanel gunakan `Dockerfile` langsung.
 
 ---
 
@@ -174,13 +221,20 @@ vim /root/.config/rclone/rclone.conf
 # OpenClaw
 openclaw onboard                          # Setup awal (pertama kali)
 openclaw doctor --fix                     # Bersihkan config lama (wajib setelah upgrade)
-openclaw gateway --port 18789 &           # Jalankan gateway manual (jika perlu)
+nohup openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 &   # Jalankan gateway manual (tanpa systemd)
+pkill -f openclaw                         # Stop semua proses openclaw (pengganti "gateway restart/stop")
+ss -tlnp | grep 18789                     # Cek gateway listen
 openclaw doctor                           # Diagnostik
+openclaw channels status                  # Status Telegram & channel lain
+openclaw pairing list telegram            # Daftar permintaan pairing Telegram
+openclaw pairing approve telegram <KODE>  # Setujui pairing
 npm install -g openclaw@2026.9.3         # Update ke versi spesifik (cara aman)
 npm install -g openclaw@latest            # Update ke versi terbaru
 
-# Plugin Management (GrowthCircle, dll)
+# Plugin Management (GrowthCircle / gc-provider, dll)
 openclaw plugins list                     # Cek daftar & versi plugin terpasang
+openclaw plugins install clawhub:gc-provider --accept-capabilities   # Install plugin GrowthCircle (jika belum ada)
+openclaw plugins enable gc-provider --accept-capabilities            # Aktifkan jika terpasang tapi disabled
 openclaw plugins update gc-provider       # Update plugin GrowthCircle ke versi terbaru (v0.1.33+)
 openclaw plugins update --all             # Update seluruh plugin terpasang
 
@@ -232,7 +286,15 @@ Semua data penting disimpan di volume `/root/.openclaw/` agar survive rebuild:
 
 | Masalah | Solusi |
 |---------|--------|
-| Bot Telegram tidak merespons | Pastikan gateway jalan: `ps aux \| grep openclaw`. Jika tidak ada, restart container atau jalankan `openclaw gateway &` |
+| Bot Telegram tidak merespons | Cek `ss -tlnp \| grep 18789` dan `openclaw channels status`. Jika gateway tidak jalan, restart container atau jalankan `nohup openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 &`. Jika bot membalas kode pairing: `openclaw pairing approve telegram <KODE>` |
+| Pilihan GrowthCircle tidak muncul di wizard onboarding | Plugin `gc-provider` belum terpasang. Jalankan `openclaw plugins install clawhub:gc-provider --accept-capabilities`, cek `openclaw plugins list`, lalu ulangi `openclaw onboard` (atau `openclaw configure`) |
+| `Plugin "gc-provider" requires capability consent` | Install/enable harus memakai flag `--accept-capabilities` (sudah otomatis di CMD container) |
+| `Missing config. Run openclaw setup` di gateway.log | Normal sebelum onboarding selesai. Setelah onboarding, restart container |
+| `another OpenClaw process owns gateway-lifecycle` | Ada proses openclaw lain (mis. onboard/TUI yang menggantung) yang menahan lock. Jalankan `pkill -f openclaw`, pastikan `ps aux \| grep -i openclaw` kosong, lalu jalankan gateway sekali dengan `nohup` |
+| `Gateway: not detected (connect ECONNREFUSED 127.0.0.1:18789)` | Gateway belum jalan. Lihat `tail -n 50 /root/.openclaw/gateway.log`, lalu jalankan gateway dengan `nohup` (lihat Langkah 3) |
+| `openclaw gateway restart/stop/install` error | Container tidak memakai systemd. Gunakan `pkill -f openclaw` + `nohup openclaw gateway ...` atau restart container di EasyPanel |
+| Telegram `running, disconnected` | Tunggu ±2 menit (grace period). Jika tetap, cek `/tmp/openclaw/openclaw-<tanggal>.log` (token salah / tidak ada akses ke api.telegram.org) dan lakukan pairing |
+| Warning "Gateway is binding to a non-loopback address" | Pastikan autentikasi gateway (token) sudah diset sebelum port 18789 dibuka ke publik |
 | Container exit sendiri | Pastikan `restart: unless-stopped` aktif |
 | Port tidak bisa diakses | Pastikan gateway bind ke `lan`: `openclaw gateway --port 18789 --bind lan &` |
 | **CPU spike 100% saat chat** | Pastikan `OPENCLAW_NO_AUTO_UPDATE=1` ter-set. Cek log: `cat /root/.openclaw/gateway.log`. Jalankan `openclaw doctor --fix` |

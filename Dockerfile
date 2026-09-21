@@ -89,26 +89,31 @@ EXPOSE 18789
 # "foreground gateway run" dari sudut pandang openclaw, sehingga self-respawn
 # loop tidak terjadi.
 #
-# Plugin gc-provider di-install otomatis jika belum ada (idempotent).
-# Data plugin tersimpan di /root/.openclaw (persistent volume).
+# Plugin gc-provider di-install otomatis jika belum ada (idempotent), SEBELUM
+# gateway start agar langsung ter-load. Butuh --accept-capabilities karena
+# install non-interaktif tidak bisa menyetujui consent capability plugin.
+# Data plugin tersimpan di /root/.openclaw/extensions (persistent volume).
 CMD ["bash", "-c", "\
   echo '🦞 OpenClaw container started.'; \
   echo \"   NODE_OPTIONS : $NODE_OPTIONS\"; \
   echo \"   AUTO_UPDATE  : $([ \"$OPENCLAW_NO_AUTO_UPDATE\" = '1' ] && echo DISABLED || echo ENABLED)\"; \
+  if openclaw plugins list 2>&1 | grep -q 'gc-provider'; then \
+    echo '✅ Plugin gc-provider already installed.'; \
+  else \
+    echo '📦 Installing plugin gc-provider...'; \
+    openclaw plugins install clawhub:gc-provider --accept-capabilities 2>&1 && \
+      echo '✅ Plugin gc-provider installed successfully.' || \
+    { echo '↪️  Install gagal, mencoba enable plugin yang sudah ada...'; \
+      openclaw plugins enable gc-provider --accept-capabilities 2>&1 && \
+        echo '✅ Plugin gc-provider enabled.' || \
+        echo '⚠️  Plugin gc-provider install failed (run manually after onboard).'; }; \
+  fi; \
   if ss -tlnp 2>/dev/null | grep -q ':18789'; then \
     echo '⚠️  Gateway already running on port 18789, skipping...'; \
   else \
     openclaw gateway --port 18789 >> /root/.openclaw/gateway.log 2>&1 & \
     echo $! > /run/openclaw-gateway.pid; \
     echo '🦞 Gateway launched (PID: '\"$!\"', logs: /root/.openclaw/gateway.log)'; \
-  fi; \
-  if openclaw plugins list 2>/dev/null | grep -q 'gc-provider'; then \
-    echo '✅ Plugin gc-provider already installed.'; \
-  else \
-    echo '📦 Installing plugin gc-provider...'; \
-    openclaw plugins install clawhub:gc-provider 2>&1 && \
-      echo '✅ Plugin gc-provider installed successfully.' || \
-      echo '⚠️  Plugin gc-provider install failed (run manually after onboard).'; \
   fi; \
   echo '💡 First time? Run: openclaw onboard'; \
   echo '🔧 Performance tip: openclaw doctor --fix (jalankan setelah onboard)'; \
